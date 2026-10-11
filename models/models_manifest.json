@@ -1,0 +1,554 @@
+{
+  "datasets": {
+    "taiwan": {
+      "features_in_X": [
+        "limit_bal",
+        "education",
+        "marriage",
+        "age",
+        "pay_0",
+        "pay_2",
+        "pay_3",
+        "pay_4",
+        "pay_5",
+        "pay_6",
+        "bill_amt1",
+        "bill_amt2",
+        "bill_amt3",
+        "bill_amt4",
+        "bill_amt5",
+        "bill_amt6",
+        "pay_amt1",
+        "pay_amt2",
+        "pay_amt3",
+        "pay_amt4",
+        "pay_amt5",
+        "pay_amt6"
+      ],
+      "categorical_features": [
+        "education",
+        "marriage",
+        "pay_0",
+        "pay_2",
+        "pay_3",
+        "pay_4",
+        "pay_5",
+        "pay_6"
+      ],
+      "numerical_features": [
+        "limit_bal",
+        "age",
+        "bill_amt1",
+        "bill_amt2",
+        "bill_amt3",
+        "bill_amt4",
+        "bill_amt5",
+        "bill_amt6",
+        "pay_amt1",
+        "pay_amt2",
+        "pay_amt3",
+        "pay_amt4",
+        "pay_amt5",
+        "pay_amt6"
+      ],
+      "categorical_unique_values": {
+        "education": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6"
+        ],
+        "marriage": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "pay_0": [
+          "-1",
+          "-2",
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "pay_2": [
+          "-1",
+          "-2",
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "pay_3": [
+          "-1",
+          "-2",
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "pay_4": [
+          "-1",
+          "-2",
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "pay_5": [
+          "-1",
+          "-2",
+          "0",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "pay_6": [
+          "-1",
+          "-2",
+          "0",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ]
+      },
+      "numerical_ranges": {
+        "limit_bal": {
+          "min": 10000.0,
+          "max": 1000000.0,
+          "median": 140000.0
+        },
+        "age": {
+          "min": 21.0,
+          "max": 79.0,
+          "median": 34.0
+        },
+        "bill_amt1": {
+          "min": -165580.0,
+          "max": 964511.0,
+          "median": 22381.5
+        },
+        "bill_amt2": {
+          "min": -69777.0,
+          "max": 983931.0,
+          "median": 21200.0
+        },
+        "bill_amt3": {
+          "min": -157264.0,
+          "max": 1664089.0,
+          "median": 20088.5
+        },
+        "bill_amt4": {
+          "min": -170000.0,
+          "max": 891586.0,
+          "median": 19052.0
+        },
+        "bill_amt5": {
+          "min": -81334.0,
+          "max": 927171.0,
+          "median": 18104.5
+        },
+        "bill_amt6": {
+          "min": -339603.0,
+          "max": 961664.0,
+          "median": 17071.0
+        },
+        "pay_amt1": {
+          "min": 0.0,
+          "max": 873552.0,
+          "median": 2100.0
+        },
+        "pay_amt2": {
+          "min": 0.0,
+          "max": 1684259.0,
+          "median": 2009.0
+        },
+        "pay_amt3": {
+          "min": 0.0,
+          "max": 896040.0,
+          "median": 1800.0
+        },
+        "pay_amt4": {
+          "min": 0.0,
+          "max": 621000.0,
+          "median": 1500.0
+        },
+        "pay_amt5": {
+          "min": 0.0,
+          "max": 426529.0,
+          "median": 1500.0
+        },
+        "pay_amt6": {
+          "min": 0.0,
+          "max": 528666.0,
+          "median": 1500.0
+        }
+      },
+      "sample_applicants": {
+        "applicant_a_low_risk": {
+          "limit_bal": 50000.0,
+          "education": 2.0,
+          "marriage": 2.0,
+          "age": 46.0,
+          "pay_0": -1.0,
+          "pay_2": -1.0,
+          "pay_3": -1.0,
+          "pay_4": -1.0,
+          "pay_5": 0.0,
+          "pay_6": 0.0,
+          "bill_amt1": 1540.0,
+          "bill_amt2": 26060.0,
+          "bill_amt3": 0.0,
+          "bill_amt4": 2650.0,
+          "bill_amt5": 3320.0,
+          "bill_amt6": 2764.0,
+          "pay_amt1": 26060.0,
+          "pay_amt2": 0.0,
+          "pay_amt3": 3472.0,
+          "pay_amt4": 2320.0,
+          "pay_amt5": 1764.0,
+          "pay_amt6": 2841.0
+        },
+        "applicant_b_higher_risk": {
+          "limit_bal": 290000.0,
+          "education": 1.0,
+          "marriage": 2.0,
+          "age": 25.0,
+          "pay_0": 0.0,
+          "pay_2": 0.0,
+          "pay_3": 0.0,
+          "pay_4": 0.0,
+          "pay_5": 0.0,
+          "pay_6": 0.0,
+          "bill_amt1": 305823.0,
+          "bill_amt2": 303701.0,
+          "bill_amt3": 296384.0,
+          "bill_amt4": 248801.0,
+          "bill_amt5": 241983.0,
+          "bill_amt6": 230925.0,
+          "pay_amt1": 15000.0,
+          "pay_amt2": 10500.0,
+          "pay_amt3": 10000.0,
+          "pay_amt4": 15000.0,
+          "pay_amt5": 7844.0,
+          "pay_amt6": 23333.0
+        }
+      }
+    },
+    "german": {
+      "features_in_X": [
+        "checking_status",
+        "duration_months",
+        "credit_history",
+        "purpose",
+        "credit_amount",
+        "savings_status",
+        "employment_duration",
+        "installment_rate",
+        "other_debtors_guarantors",
+        "present_residence_since",
+        "property",
+        "age",
+        "other_installment_plans",
+        "housing",
+        "existing_credits",
+        "job",
+        "num_dependents",
+        "telephone",
+        "foreign_worker"
+      ],
+      "categorical_features": [
+        "checking_status",
+        "credit_history",
+        "purpose",
+        "savings_status",
+        "employment_duration",
+        "other_debtors_guarantors",
+        "property",
+        "other_installment_plans",
+        "housing",
+        "job",
+        "telephone",
+        "foreign_worker"
+      ],
+      "numerical_features": [
+        "duration_months",
+        "credit_amount",
+        "installment_rate",
+        "present_residence_since",
+        "age",
+        "existing_credits",
+        "num_dependents"
+      ],
+      "categorical_unique_values": {
+        "checking_status": [
+          "A11",
+          "A12",
+          "A13",
+          "A14"
+        ],
+        "credit_history": [
+          "A30",
+          "A31",
+          "A32",
+          "A33",
+          "A34"
+        ],
+        "purpose": [
+          "A40",
+          "A41",
+          "A410",
+          "A42",
+          "A43",
+          "A44",
+          "A45",
+          "A46",
+          "A48",
+          "A49"
+        ],
+        "savings_status": [
+          "A61",
+          "A62",
+          "A63",
+          "A64",
+          "A65"
+        ],
+        "employment_duration": [
+          "A71",
+          "A72",
+          "A73",
+          "A74",
+          "A75"
+        ],
+        "other_debtors_guarantors": [
+          "A101",
+          "A102",
+          "A103"
+        ],
+        "property": [
+          "A121",
+          "A122",
+          "A123",
+          "A124"
+        ],
+        "other_installment_plans": [
+          "A141",
+          "A142",
+          "A143"
+        ],
+        "housing": [
+          "A151",
+          "A152",
+          "A153"
+        ],
+        "job": [
+          "A171",
+          "A172",
+          "A173",
+          "A174"
+        ],
+        "telephone": [
+          "A191",
+          "A192"
+        ],
+        "foreign_worker": [
+          "A201",
+          "A202"
+        ]
+      },
+      "numerical_ranges": {
+        "duration_months": {
+          "min": 4.0,
+          "max": 72.0,
+          "median": 18.0
+        },
+        "credit_amount": {
+          "min": 250.0,
+          "max": 18424.0,
+          "median": 2319.5
+        },
+        "installment_rate": {
+          "min": 1.0,
+          "max": 4.0,
+          "median": 3.0
+        },
+        "present_residence_since": {
+          "min": 1.0,
+          "max": 4.0,
+          "median": 3.0
+        },
+        "age": {
+          "min": 19.0,
+          "max": 75.0,
+          "median": 33.0
+        },
+        "existing_credits": {
+          "min": 1.0,
+          "max": 4.0,
+          "median": 1.0
+        },
+        "num_dependents": {
+          "min": 1.0,
+          "max": 2.0,
+          "median": 1.0
+        }
+      },
+      "sample_applicants": {
+        "applicant_a_low_risk": {
+          "checking_status": "A12",
+          "duration_months": 18,
+          "credit_history": "A32",
+          "purpose": "A49",
+          "credit_amount": 1913,
+          "savings_status": "A64",
+          "employment_duration": "A72",
+          "installment_rate": 3,
+          "other_debtors_guarantors": "A101",
+          "present_residence_since": 3,
+          "property": "A121",
+          "age": 36,
+          "other_installment_plans": "A141",
+          "housing": "A152",
+          "existing_credits": 1,
+          "job": "A173",
+          "num_dependents": 1,
+          "telephone": "A192",
+          "foreign_worker": "A201"
+        },
+        "applicant_b_higher_risk": {
+          "checking_status": "A11",
+          "duration_months": 24,
+          "credit_history": "A33",
+          "purpose": "A43",
+          "credit_amount": 1024,
+          "savings_status": "A61",
+          "employment_duration": "A72",
+          "installment_rate": 4,
+          "other_debtors_guarantors": "A101",
+          "present_residence_since": 4,
+          "property": "A121",
+          "age": 48,
+          "other_installment_plans": "A142",
+          "housing": "A152",
+          "existing_credits": 1,
+          "job": "A173",
+          "num_dependents": 1,
+          "telephone": "A191",
+          "foreign_worker": "A201"
+        }
+      }
+    }
+  },
+  "configurations": [
+    {
+      "dataset": "taiwan",
+      "model": "logistic_regression",
+      "baseline_model_file": "taiwan_logistic_regression_baseline.joblib",
+      "reweighed_model_file": "taiwan_logistic_regression_reweighed.joblib",
+      "background_file": "taiwan_logistic_regression_background.joblib",
+      "test_metrics": {
+        "baseline_auc": 0.7574,
+        "baseline_accuracy": 0.8173,
+        "reweighed_auc": 0.7582,
+        "reweighed_accuracy": 0.8175
+      }
+    },
+    {
+      "dataset": "taiwan",
+      "model": "random_forest",
+      "baseline_model_file": "taiwan_random_forest_baseline.joblib",
+      "reweighed_model_file": "taiwan_random_forest_reweighed.joblib",
+      "background_file": "taiwan_random_forest_background.joblib",
+      "test_metrics": {
+        "baseline_auc": 0.7528,
+        "baseline_accuracy": 0.8118,
+        "reweighed_auc": 0.7548,
+        "reweighed_accuracy": 0.8123
+      }
+    },
+    {
+      "dataset": "taiwan",
+      "model": "xgboost",
+      "baseline_model_file": "taiwan_xgboost_baseline.joblib",
+      "reweighed_model_file": "taiwan_xgboost_reweighed.joblib",
+      "background_file": "taiwan_xgboost_background.joblib",
+      "test_metrics": {
+        "baseline_auc": 0.7785,
+        "baseline_accuracy": 0.8193,
+        "reweighed_auc": 0.7774,
+        "reweighed_accuracy": 0.819
+      }
+    },
+    {
+      "dataset": "german",
+      "model": "logistic_regression",
+      "baseline_model_file": "german_logistic_regression_baseline.joblib",
+      "reweighed_model_file": "german_logistic_regression_reweighed.joblib",
+      "background_file": "german_logistic_regression_background.joblib",
+      "test_metrics": {
+        "baseline_auc": 0.8061,
+        "baseline_accuracy": 0.785,
+        "reweighed_auc": 0.8055,
+        "reweighed_accuracy": 0.785
+      }
+    },
+    {
+      "dataset": "german",
+      "model": "random_forest",
+      "baseline_model_file": "german_random_forest_baseline.joblib",
+      "reweighed_model_file": "german_random_forest_reweighed.joblib",
+      "background_file": "german_random_forest_background.joblib",
+      "test_metrics": {
+        "baseline_auc": 0.7798,
+        "baseline_accuracy": 0.78,
+        "reweighed_auc": 0.7935,
+        "reweighed_accuracy": 0.78
+      }
+    },
+    {
+      "dataset": "german",
+      "model": "xgboost",
+      "baseline_model_file": "german_xgboost_baseline.joblib",
+      "reweighed_model_file": "german_xgboost_reweighed.joblib",
+      "background_file": "german_xgboost_background.joblib",
+      "test_metrics": {
+        "baseline_auc": 0.8019,
+        "baseline_accuracy": 0.775,
+        "reweighed_auc": 0.7918,
+        "reweighed_accuracy": 0.775
+      }
+    }
+  ]
+}

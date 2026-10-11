@@ -1,14 +1,23 @@
-# Python & Virtual Environments
+﻿# Python & Virtual Environments
 .venv/
 venv/
 ENV/
 env/
+.pytest_cache/
 
 # Byte-code / caches
 __pycache__/
 *.py[cod]
 *.class
 *.so
+
+# Node.js & Next.js
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+frontend/out/
+.env*.local
 
 # Backups and temporary artifacts
 backups/
@@ -22,3 +31,6 @@ Thumbs.db
 .ipynb_checkpoints/
 .vscode/
 .idea/
+
+# Large Model Binary Artifacts (Reproducible via scripts/export_inference_artifacts.py)
+models/*.joblib
