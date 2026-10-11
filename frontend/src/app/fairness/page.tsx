@@ -31,7 +31,8 @@ import {
   formatMetric,
   formatModelLabel,
   formatDatasetLabel,
-  formatMitigationLabel
+  formatMitigationLabel,
+  formatFeatureLabel
 } from "@/lib/utils";
 
 function normalizeMatrixRecord(raw: any): ResearchMatrixRow | null {
@@ -414,14 +415,21 @@ export default function FairnessPage() {
           {individualShap?.attributions && individualShap.attributions.length > 0 ? (
             <ShapBarChart
               data={individualShap.attributions.map((a) => ({
-                feature: a.feature || "Unknown Feature",
-                feature_raw: a.feature || "",
+                feature: formatFeatureLabel(a.feature),
+                feature_raw: a.feature_raw || a.feature || "",
                 baseline_shap: typeof a.baseline_shap === "number" ? a.baseline_shap : 0,
                 reweighed_shap: typeof a.reweighed_shap === "number" ? a.reweighed_shap : 0,
                 diff_shap: typeof a.diff_shap === "number" ? a.diff_shap : 0,
                 direction: (a.baseline_shap ?? 0) > 0 ? "increases_risk" : "reduces_risk"
               }))}
               title={`Held-Out Applicant #${applicantIdx} — Baseline vs. Reweighed SHAP Attributions`}
+              outputSpace={
+                selectedModel === "random_forest"
+                  ? "Probability Space P(Y=1)"
+                  : selectedModel === "logistic_regression"
+                  ? "Log-Odds Margin Space (Linear)"
+                  : "Margin Space (Tree Ensembles)"
+              }
             />
           ) : (
             <div className="h-40 flex items-center justify-center text-slate-400 text-xs italic">

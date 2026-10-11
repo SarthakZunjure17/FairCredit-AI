@@ -20,41 +20,7 @@ from backend.app.schemas.assessment import (
     ExplanationResponse
 )
 
-FEATURE_NAME_MAP = {
-    "num__limit_bal": "Credit Limit (NTD)",
-    "num__age": "Age",
-    "num__bill_amt1": "Bill Amount (Sep)",
-    "num__bill_amt2": "Bill Amount (Aug)",
-    "num__bill_amt3": "Bill Amount (Jul)",
-    "num__bill_amt4": "Bill Amount (Jun)",
-    "num__bill_amt5": "Bill Amount (May)",
-    "num__bill_amt6": "Bill Amount (Apr)",
-    "num__pay_amt1": "Payment Amount (Sep)",
-    "num__pay_amt2": "Payment Amount (Aug)",
-    "num__pay_amt3": "Payment Amount (Jul)",
-    "num__pay_amt4": "Payment Amount (Jun)",
-    "num__pay_amt5": "Payment Amount (May)",
-    "num__pay_amt6": "Payment Amount (Apr)",
-    "num__duration_months": "Loan Duration (Months)",
-    "num__credit_amount": "Credit Amount (DM)",
-    "num__installment_rate": "Installment Rate (% Disposable Inc)",
-    "num__present_residence_since": "Residence Duration (Years)",
-    "num__existing_credits": "Existing Credits Count",
-    "num__num_dependents": "Number of Dependents"
-}
-
-def format_feature_label(raw_feature: str) -> str:
-    if raw_feature in FEATURE_NAME_MAP:
-        return FEATURE_NAME_MAP[raw_feature]
-    if raw_feature.startswith("cat__"):
-        parts = raw_feature[5:].split("_")
-        val = parts[-1]
-        field = " ".join(parts[:-1]).title()
-        return f"{field}: {val}"
-    if raw_feature.startswith("num__"):
-        return raw_feature[5:].replace("_", " ").title()
-    return raw_feature.replace("_", " ").title()
-
+from backend.app.services.feature_dictionary import format_feature_label
 class ModelInferenceService:
     def __init__(self):
         self.models_dir = os.path.join(project_root, "models")
@@ -248,7 +214,14 @@ class ModelInferenceService:
         records.sort(key=lambda x: x["abs_impact"], reverse=True)
         top_10 = [FeatureAttribution(**r) for r in records[:10]]
 
-        output_space_desc = "Probability Space P(Y=1)" if m == "random_forest" else "Log-Odds Margin Space (Linear/Additive)"
+        if m == "random_forest":
+            output_space_desc = "Probability Space P(Y=1) (Additive to baseline default rate)"
+        elif m == "logistic_regression":
+            output_space_desc = "Log-Odds Margin Space (Linear logit link scale)"
+        elif m == "xgboost":
+            output_space_desc = "Margin Space (Raw tree ensemble sum before logistic sigmoid)"
+        else:
+            output_space_desc = "Continuous Output Space"
 
         summary_text = (
             f"Top driving features for this applicant under {m.replace('_', ' ').title()}: "

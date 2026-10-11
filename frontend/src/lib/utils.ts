@@ -73,3 +73,5 @@ export function formatMitigationLabel(mitigation: string | undefined | null): st
   const key = mitigation.toLowerCase().trim().replace(/[\s-]+/g, "_");
   return MITIGATION_LABELS[key] || mitigation.replace(/_/g, " ");
 }
+
+export { formatFeatureLabel } from "./featureDictionary";

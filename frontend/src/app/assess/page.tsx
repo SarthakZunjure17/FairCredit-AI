@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -23,7 +23,13 @@ import {
 } from "@/types";
 import { MetricCard } from "@/components/MetricCard";
 import { ShapBarChart } from "@/components/ShapBarChart";
-import { DATASET_LABELS, MODEL_LABELS, formatPercent } from "@/lib/utils";
+import {
+  DATASET_LABELS,
+  MODEL_LABELS,
+  formatPercent,
+  formatDatasetLabel,
+  formatModelLabel
+} from "@/lib/utils";
 
 export default function AssessPage() {
   const [configData, setConfigData] = useState<ConfigurationsResponse | null>(null);
@@ -59,6 +65,7 @@ export default function AssessPage() {
     setSelectedDataset(newDs);
     setAssessmentResult(null);
     setExplanationResult(null);
+    setErrorMessage(null);
     if (configData?.dataset_schemas[newDs]) {
       const sample = configData.dataset_schemas[newDs].sample_applicants?.applicant_a_low_risk || {};
       setFeatures(sample);
@@ -73,6 +80,7 @@ export default function AssessPage() {
         setFeatures(sample);
         setAssessmentResult(null);
         setExplanationResult(null);
+        setErrorMessage(null);
       }
     }
   };
@@ -86,13 +94,13 @@ export default function AssessPage() {
   };
 
   // Run assessment & local SHAP explanation
-  const handleRunAssessment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRunAssessment = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      // 1. Live model prediction (Baseline vs Reweighed)
+      // 1. Live model prediction (Baseline vs Reweighed) using identical profile
       const predRes = await api.predictApplicant(selectedDataset, selectedModel, features);
       setAssessmentResult(predRes);
 
@@ -100,13 +108,13 @@ export default function AssessPage() {
       const expRes = await api.explainApplicant(selectedDataset, selectedModel, features);
       setExplanationResult(expRes);
     } catch (err: any) {
-      setErrorMessage(`Inference failed: ${err.message}`);
+      setAssessmentResult(null);
+      setExplanationResult(null);
+      setErrorMessage(`Inference failed: ${err.message}. Please verify the backend service is running and retry.`);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const schemaInfo = configData?.dataset_schemas[selectedDataset];
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -119,19 +127,29 @@ export default function AssessPage() {
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
           Interactive Credit Risk Assessment
         </h1>
-        <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl">
-          Score credit default risk on verified saved models and observe how pre-processing fairness Reweighing alters
-          the applicant’s estimated default probability and local SHAP feature attributions.
+        <p className="text-sm text-slate-600 mt-1.5 max-w-3xl leading-relaxed">
+          Audit how pre-processing <strong>Reweighing</strong> fairness mitigation alters the estimated probability of default and SHAP feature attributions for an identical applicant profile.
         </p>
       </div>
 
       {errorMessage && (
-        <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start space-x-2.5">
-          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">Assessment Error</p>
-            <p className="mt-0.5 leading-normal">{errorMessage}</p>
+        <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start justify-between gap-3">
+          <div className="flex items-start space-x-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Assessment Request Failed</p>
+              <p className="mt-0.5 leading-normal">{errorMessage}</p>
+              <p className="mt-1 text-[11px] text-rose-700 italic">No fallback or fabricated results are displayed.</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => handleRunAssessment()}
+            className="shrink-0 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs transition-colors flex items-center space-x-1"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Assessment</span>
+          </button>
         </div>
       )}
 
@@ -255,11 +273,11 @@ export default function AssessPage() {
                         onChange={(e) => handleFeatureChange("credit_history", e.target.value)}
                         className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-700"
                       >
-                        <option value="A30">Delayed in Past (A30)</option>
-                        <option value="A31">Critical Account (A31)</option>
+                        <option value="A30">No Credits Taken / Paid Duly (A30)</option>
+                        <option value="A31">Paid Duly at Bank (A31)</option>
                         <option value="A32">Existing Paid Duly (A32)</option>
                         <option value="A33">Delay in Paying Off (A33)</option>
-                        <option value="A34">Critical / Other Credits (A34)</option>
+                        <option value="A34">Critical Account / Other Credits (A34)</option>
                       </select>
                     </div>
                   </div>
@@ -268,7 +286,7 @@ export default function AssessPage() {
                     <div>
                       <label className="text-[11px] font-medium text-slate-600">Savings Status</label>
                       <select
-                        value={features["savings_status"] ?? "A65"}
+                        value={features["savings_status"] ?? "A61"}
                         onChange={(e) => handleFeatureChange("savings_status", e.target.value)}
                         className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-700"
                       >
@@ -464,7 +482,7 @@ export default function AssessPage() {
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Computing Inference & SHAP Values…</span>
+                  <span>Computing Real Inference &amp; SHAP Values…</span>
                 </>
               ) : (
                 <>
@@ -488,7 +506,7 @@ export default function AssessPage() {
                       Model Inference Result
                     </span>
                     <h3 className="text-base font-bold text-slate-900 capitalize">
-                      {DATASET_LABELS[assessmentResult.dataset]} — {MODEL_LABELS[assessmentResult.model]}
+                      {formatDatasetLabel(assessmentResult.dataset)} — {formatModelLabel(assessmentResult.model)}
                     </h3>
                   </div>
                   <span className="text-[11px] font-mono text-teal-800 bg-teal-50 px-2.5 py-1 rounded border border-teal-200">
@@ -497,65 +515,118 @@ export default function AssessPage() {
                 </div>
 
                 {/* Baseline vs Reweighed Probability Comparison */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Baseline Card */}
-                  <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-                      <span>Baseline Model</span>
-                      <span className="font-semibold text-slate-700">{assessmentResult.baseline.prediction_label}</span>
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs text-slate-500 font-medium border-b border-slate-200/60 pb-2">
+                      <div>
+                        <span className="font-bold text-slate-800 text-sm">Baseline Model</span>
+                        <p className="text-[10px] text-slate-500">Original trained model (no fairness mitigation)</p>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded">
+                        Threshold: {assessmentResult.baseline.prediction === 1 ? "Class 1 (Default)" : "Class 0 (Non-Default)"}
+                      </span>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900">
-                      {formatPercent(assessmentResult.baseline.default_probability)}
+                    <div>
+                      <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider block">
+                        Estimated Probability of Default
+                      </span>
+                      <div className="text-3xl font-extrabold tracking-tight text-slate-900 mt-0.5">
+                        {formatPercent(assessmentResult.baseline.default_probability)}
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        P(Default = 1 | X) = {assessmentResult.baseline.default_probability.toFixed(4)}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-500">
-                      Estimated Probability of Default P(Y=1)
-                    </p>
                   </div>
 
                   {/* Reweighed Card */}
-                  <div className="p-4 rounded-lg bg-teal-50/70 border border-teal-200 space-y-1">
-                    <div className="flex items-center justify-between text-xs text-teal-800 font-medium">
-                      <span>Reweighed Model (Mitigated)</span>
-                      <span className="font-semibold text-teal-900">{assessmentResult.reweighed.prediction_label}</span>
+                  <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs text-teal-800 font-medium border-b border-teal-200/60 pb-2">
+                      <div>
+                        <span className="font-bold text-teal-950 text-sm">Reweighed Model</span>
+                        <p className="text-[10px] text-teal-700">Fairness-mitigated model (pre-processing sample weights)</p>
+                      </div>
+                      <span className="text-[10px] font-mono text-teal-800 bg-teal-100/90 px-2 py-0.5 rounded">
+                        Threshold: {assessmentResult.reweighed.prediction === 1 ? "Class 1 (Default)" : "Class 0 (Non-Default)"}
+                      </span>
                     </div>
-                    <div className="text-2xl font-bold text-teal-950">
-                      {formatPercent(assessmentResult.reweighed.default_probability)}
+                    <div>
+                      <span className="text-[11px] font-semibold text-teal-800 uppercase tracking-wider block">
+                        Estimated Probability of Default
+                      </span>
+                      <div className="text-3xl font-extrabold tracking-tight text-teal-950 mt-0.5">
+                        {formatPercent(assessmentResult.reweighed.default_probability)}
+                      </div>
+                      <p className="text-[10px] text-teal-700 font-mono mt-0.5">
+                        P(Default = 1 | X, weights) = {assessmentResult.reweighed.default_probability.toFixed(4)}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-teal-700">
-                      Fairness-Adjusted Default Risk Estimate
-                    </p>
                   </div>
                 </div>
 
                 {/* Shift / Delta Interpretation */}
-                <div className="p-3.5 rounded-lg bg-white border border-slate-200 text-xs space-y-1">
-                  <div className="flex items-center space-x-2 font-semibold text-slate-800">
-                    {assessmentResult.delta.direction === "decreased" ? (
-                      <TrendingDown className="w-4 h-4 text-emerald-600" />
-                    ) : assessmentResult.delta.direction === "increased" ? (
-                      <TrendingUp className="w-4 h-4 text-amber-600" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4 text-slate-600" />
-                    )}
-                    <span>
-                      Reweighing Shift: {assessmentResult.delta.percent_difference > 0 ? `+${assessmentResult.delta.percent_difference}%` : `${assessmentResult.delta.percent_difference}%`}
-                    </span>
-                  </div>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
-                    {assessmentResult.delta.interpretation}
+                {(() => {
+                  const pBase = assessmentResult.baseline.default_probability;
+                  const pRew = assessmentResult.reweighed.default_probability;
+                  const diff = Number((pRew - pBase).toFixed(4));
+                  const diffPctPoints = Number((diff * 100).toFixed(2));
+                  const signStr = diffPctPoints > 0 ? `+${diffPctPoints.toFixed(2)}` : diffPctPoints.toFixed(2);
+
+                  return (
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 font-semibold text-slate-800">
+                          {diff < -0.0005 ? (
+                            <TrendingDown className="w-4 h-4 text-emerald-600" />
+                          ) : diff > 0.0005 ? (
+                            <TrendingUp className="w-4 h-4 text-amber-600" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-slate-600" />
+                          )}
+                          <span>
+                            Reweighing Probability Shift: {signStr} percentage points ({signStr}%)
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Reweighed − Baseline
+                        </span>
+                      </div>
+
+                      <p className="text-slate-600 text-xs leading-relaxed">
+                        The difference represents how the estimated probability of default changes for this identical applicant profile when evaluated by the fairness-mitigated Reweighed model compared to the original baseline model.
+                      </p>
+
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {assessmentResult.delta.interpretation}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Unobtrusive Model-Specific Information Note */}
+                <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 text-amber-900 text-xs flex items-start space-x-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed">
+                    <strong>Auditing &amp; Research Note:</strong> Both values are model-specific estimated probabilities of default generated for research auditing. They do <em>not</em> constitute a credit underwriting decision, loan approval, rejection, credit score, or guarantee of a future financial outcome.
                   </p>
                 </div>
               </div>
 
               {/* Local SHAP Explanations Section */}
               <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
-                <div className="border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Local SHAP Feature Attributions
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Measuring the individual marginal contribution of this applicant’s financial features toward default risk.
-                  </p>
+                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Local SHAP Feature Attributions
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Measuring the individual marginal contribution of this applicant's financial features toward default risk.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono text-teal-800 bg-teal-50 px-2.5 py-1 rounded border border-teal-200 self-start sm:self-auto">
+                    {explanationResult ? explanationResult.output_space : "Awaiting Evaluation"}
+                  </span>
                 </div>
 
                 {explanationResult ? (
@@ -566,8 +637,67 @@ export default function AssessPage() {
                       outputSpace={explanationResult.output_space}
                     />
 
+                    {/* Attribution Direction & Interpretation Guide */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1.5 font-semibold text-rose-700">
+                          <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                          <span>Positive Attribution (&gt; 0)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-normal">
+                          Pushes model output toward <strong>higher estimated default risk</strong> for this applicant.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1.5 font-semibold text-emerald-700">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                          <span>Negative Attribution (&lt; 0)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-normal">
+                          Pushes model output toward <strong>lower estimated default risk</strong> (protective influence).
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1.5 font-semibold text-slate-700">
+                          <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                          <span>Near-Zero Attribution (≈ 0)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-normal">
+                          Negligible marginal contribution to this prediction under the selected architecture.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Output Space & Methodological Semantics Guide */}
+                    <div className="p-3.5 rounded-lg bg-blue-50/60 border border-blue-200/80 text-xs text-slate-700 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-blue-900">
+                          Output Space &amp; Interpretation Semantics
+                        </span>
+                        <span className="font-mono text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                          {selectedModel === "random_forest"
+                            ? "Probability Space P(Y=1)"
+                            : selectedModel === "logistic_regression"
+                            ? "Log-Odds Margin Space (Linear)"
+                            : "Margin Space (Tree Ensembles)"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        {selectedModel === "random_forest"
+                          ? "Random Forest SHAP values operate in probability space: feature attributions sum to the difference between the applicant's predicted default probability and the base rate."
+                          : selectedModel === "logistic_regression"
+                          ? "Logistic Regression SHAP values operate in log-odds margin space: feature attributions sum to the linear logit shift relative to the background baseline."
+                          : "XGBoost SHAP values operate in margin space (log-odds before logistic sigmoid). Raw SHAP values must not be directly compared across different model architectures."}
+                      </p>
+                      <p className="text-[10px] text-slate-500 italic">
+                        * Causal Disclaimer: SHAP attributions reflect mathematical credit assignment within the fitted statistical model, not real-world causal mechanisms.
+                      </p>
+                    </div>
+
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-                      <p className="font-semibold text-slate-800">Interpretation Note</p>
+                      <p className="font-semibold text-slate-800">Automated Summary</p>
                       <p className="text-[11px] leading-relaxed">
                         {explanationResult.summary}
                       </p>
@@ -577,23 +707,25 @@ export default function AssessPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="h-48 flex items-center justify-center text-slate-400 text-xs italic">
-                    Computing local feature explanations…
+                  <div className="h-48 flex items-center justify-center text-slate-400 text-xs italic bg-slate-50 rounded-lg border border-slate-200">
+                    Submit an applicant profile above to compute real-time SHAP feature attributions.
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            /* Empty State */
-            <div className="p-12 rounded-xl bg-white border border-dashed border-slate-300 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
-                <BarChart3 className="w-6 h-6" />
+            <div className="p-12 rounded-xl bg-white border border-slate-200 shadow-xs text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center mx-auto text-teal-700">
+                <Layers className="w-6 h-6" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-sm">Ready to Score Synthetic Applicant</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                Select your dataset and model architecture, adjust applicant financial parameters or choose a preset,
-                then click <strong>Run Credit-Risk Assessment</strong> to initiate real machine-learning inference.
-              </p>
+              <div className="max-w-md mx-auto space-y-1.5">
+                <h3 className="text-base font-bold text-slate-800">
+                  Ready for Credit Risk Assessment
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Select a dataset, model architecture, or demonstration preset profile, then click <strong>Run Credit-Risk Assessment</strong> to generate real-time Baseline vs. Reweighed default probabilities and local SHAP attributions.
+                </p>
+              </div>
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
-﻿import os
+from backend.app.services.feature_dictionary import format_feature_label
+import os
 import json
 from typing import Dict, Any, List, Optional
 import pandas as pd
@@ -166,7 +167,16 @@ class ResearchDataService:
                 (df_all["applicant_idx"] == first_idx)
             ]
 
-        records = sub[["feature", "baseline_shap", "reweighed_shap", "diff_shap"]].to_dict(orient="records")
+        records = []
+        for _, row in sub.iterrows():
+            raw_f = str(row["feature"])
+            records.append({
+                "feature": format_feature_label(raw_f),
+                "feature_raw": raw_f,
+                "baseline_shap": float(row["baseline_shap"]),
+                "reweighed_shap": float(row["reweighed_shap"]),
+                "diff_shap": float(row["diff_shap"])
+            })
         return records
 
     def get_case_study_data(self) -> Dict[str, Any]:

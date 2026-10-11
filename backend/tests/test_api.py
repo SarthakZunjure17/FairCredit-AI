@@ -112,3 +112,68 @@ def test_research_individual_shap():
     assert data["dataset"] == "german"
     assert data["model"] == "random_forest"
     assert len(data["attributions"]) > 0
+
+
+def test_probability_representation_and_delta_math():
+    cfg_resp = client.get("/api/configurations").json()
+    german_sample = cfg_resp["dataset_schemas"]["german"]["sample_applicants"]["applicant_a_low_risk"]
+
+    payload = {
+        "dataset": "german",
+        "model": "random_forest",
+        "features": german_sample
+    }
+    response = client.post("/api/predict", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    
+    p_base = data["baseline"]["default_probability"]
+    p_rew = data["reweighed"]["default_probability"]
+    
+    assert 0.0 <= p_base <= 1.0
+    assert 0.0 <= p_rew <= 1.0
+    
+    expected_diff = round(p_rew - p_base, 4)
+    expected_pct_diff = round(expected_diff * 100, 2)
+    
+    assert abs(data["delta"]["probability_difference"] - expected_diff) < 1e-4
+    assert abs(data["delta"]["percent_difference"] - expected_pct_diff) < 1e-2
+    assert "output_space" in data["baseline"]
+    assert len(data["baseline"]["output_space"]) > 0
+
+def test_feature_label_formatting():
+    from backend.app.services.feature_dictionary import format_feature_label
+    
+    assert format_feature_label("cat__checking_status_A14") == "Checking Account Status: No Checking Account (A14)"
+    assert format_feature_label("cat__credit_history_A34") == "Credit Payment History: Critical Account / Other Credits (A34)"
+    assert format_feature_label("num__duration_months") == "Loan Duration (Months)"
+    assert format_feature_label("cat__pay_0_2") == "Repayment Sep: Payment Delay 2 Months (2)"
+    assert format_feature_label(None) == "Unavailable"
+
+def test_invalid_dataset_error_handling():
+    payload = {
+        "dataset": "invalid_dataset_name",
+        "model": "random_forest",
+        "features": {}
+    }
+    response = client.post("/api/predict", json=payload)
+    assert response.status_code in (400, 422)
+
+def test_invalid_model_error_handling():
+    payload = {
+        "dataset": "german",
+        "model": "unsupported_model_arch",
+        "features": {}
+    }
+    response = client.post("/api/predict", json=payload)
+    assert response.status_code in (400, 422)
+
+def test_individual_shap_feature_formatting():
+    response = client.get("/api/research/individual-shap?dataset=german&model=random_forest&applicant_idx=0")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["attributions"]) > 0
+    first_attr = data["attributions"][0]
+    assert "feature" in first_attr
+    assert "feature_raw" in first_attr
+    assert not first_attr["feature"].startswith("cat__")

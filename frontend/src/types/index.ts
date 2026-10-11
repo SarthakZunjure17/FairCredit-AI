@@ -141,6 +141,7 @@ export interface IndividualShapResponse {
   applicant_idx: number;
   attributions: Array<{
     feature: string;
+    feature_raw?: string;
     baseline_shap: number;
     reweighed_shap: number;
     diff_shap: number;
