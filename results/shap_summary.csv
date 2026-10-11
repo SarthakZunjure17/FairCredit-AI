@@ -1,0 +1,7 @@
+dataset,model,n_applicants,n_features,cosine_mean,cosine_ci_95_low,cosine_ci_95_high,cosine_median,cosine_std,top5_overlap_mean,top5_overlap_ci_95_low,top5_overlap_ci_95_high,top5_overlap_median,top5_overlap_std,rank_corr_mean,rank_corr_ci_95_low,rank_corr_ci_95_high,rank_corr_median,rank_corr_std,comparable_nn_mean_cosine,comparable_nn_mean_top5,comparable_nn_mean_rank
+german,logistic_regression,200,57,0.9983,0.9982,0.9984,0.9985,0.0008,0.954,0.942,0.966,1.0,0.0844,0.9908,0.9904,0.9912,0.9909,0.0027,0.5019,0.619,0.5962
+german,xgboost,200,57,0.9757,0.9735,0.9779,0.9793,0.0163,0.838,0.822,0.853,0.8,0.1141,0.9173,0.9122,0.9223,0.9233,0.036,0.2045,0.489,0.2578
+german,random_forest,200,57,0.9652,0.9624,0.9677,0.9693,0.0196,0.837,0.821,0.854,0.8,0.1237,0.8891,0.8812,0.8964,0.8999,0.0553,0.1353,0.535,0.2165
+taiwan,logistic_regression,500,89,0.9996,0.9995,0.9996,0.9997,0.0004,0.98,0.9744,0.9852,1.0,0.0601,0.9832,0.9831,0.9834,0.9835,0.0016,0.8187,0.8428,0.8219
+taiwan,xgboost,500,89,0.9787,0.9772,0.9803,0.9828,0.018,0.8864,0.8756,0.8976,0.8,0.1203,0.8871,0.8823,0.8917,0.8907,0.0515,0.4674,0.5924,0.5114
+taiwan,random_forest,500,89,0.938,0.9341,0.9419,0.9458,0.0429,0.7924,0.7792,0.8052,0.8,0.1515,0.7768,0.7692,0.7846,0.7844,0.087,0.349,0.538,0.3853

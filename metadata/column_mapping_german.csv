@@ -1,0 +1,23 @@
+attribute_index,raw_doc_name,standardized_column,role,dtype,description
+Attribute 1,Status of existing checking account,checking_status,feature,object,"Checking account status: A11 (<0 DM), A12 (0-200 DM), A13 (>=200 DM / salary), A14 (no checking)"
+Attribute 2,Duration in month,duration_months,feature,int64,Duration of credit in months (4 to 72)
+Attribute 3,Credit history,credit_history,feature,object,"Credit history: A30 (no credits/paid duly), A31 (all at this bank paid duly), A32 (existing paid duly), A33 (delay in past), A34 (critical account/other credits)"
+Attribute 4,Purpose,purpose,feature,object,"Loan purpose: A40 (new car), A41 (used car), A42 (furniture), A43 (radio/tv), A44 (domestic appliances), A45 (repairs), A46 (education), A48 (retraining), A49 (business), A410 (others)"
+Attribute 5,Credit amount,credit_amount,feature,int64,Credit amount in DM (250 to 18424)
+Attribute 6,Savings account/bonds,savings_status,feature,object,"Savings/bonds balance: A61 (<100 DM), A62 (100-500 DM), A63 (500-1000 DM), A64 (>=1000 DM), A65 (unknown/no savings)"
+Attribute 7,Present employment since,employment_duration,feature,object,"Present employment duration: A71 (unemployed), A72 (<1 yr), A73 (1-4 yrs), A74 (4-7 yrs), A75 (>=7 yrs)"
+Attribute 8,Installment rate in percentage of disposable income,installment_rate,feature,int64,"Installment rate percentage: 1, 2, 3, 4"
+Attribute 9,Personal status and sex,personal_status_sex,candidate_protected_attribute,object,"Sex and marital status: A91 (male: divorced/sep), A92 (female: div/sep/mar), A93 (male: single), A94 (male: mar/wid)"
+Attribute 10,Other debtors / guarantors,other_debtors_guarantors,feature,object,"Other parties: A101 (none), A102 (co-applicant), A103 (guarantor)"
+Attribute 11,Present residence since,present_residence_since,feature,int64,"Years at present residence: 1, 2, 3, 4"
+Attribute 12,Property,property,feature,object,"Most valuable property: A121 (real estate), A122 (building society/life ins), A123 (car/other), A124 (unknown/no property)"
+Attribute 13,Age in years,age,candidate_protected_attribute,int64,Age in years (19 to 75)
+Attribute 14,Other installment plans,other_installment_plans,feature,object,"Other installment plans: A141 (bank), A142 (stores), A143 (none)"
+Attribute 15,Housing,housing,feature,object,"Housing status: A151 (rent), A152 (own), A153 (for free)"
+Attribute 16,Number of existing credits at this bank,existing_credits,feature,int64,"Number of existing credits: 1, 2, 3, 4"
+Attribute 17,Job,job,feature,object,"Job qualification: A171 (unemployed/unskilled non-res), A172 (unskilled res), A173 (skilled/official), A174 (management/self-emp/highly qual)"
+Attribute 18,Number of people being liable to provide maintenance for,num_dependents,feature,int64,"Number of maintenance dependents: 1, 2"
+Attribute 19,Telephone,telephone,feature,object,"Telephone registration: A191 (none), A192 (yes, registered customer name)"
+Attribute 20,foreign worker,foreign_worker,candidate_protected_attribute,object,"Foreign worker status: A201 (yes), A202 (no)"
+Target/Class,Cost Matrix / Class,original_target,target,int64,"Original raw class label: 1=Good, 2=Bad"
+Target/Class,Standardized Target,target,target,int64,"Standardized binary target: 1=Bad Credit / Risk Event, 0=Good Credit"

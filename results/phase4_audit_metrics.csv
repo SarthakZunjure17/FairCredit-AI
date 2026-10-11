@@ -1,0 +1,7 @@
+dataset,model,eval_cohort_n,expected_applicants,applicant_id_matches,applicant_id_mismatches,feature_count,feature_order_match,leakage_status,shap_output_space,max_reconstruction_error,mean_reconstruction_error,cosine_mean,cosine_median,top5_overlap_mean,top5_overlap_median,rank_corr_mean,rank_corr_median,female_cosine_mean,male_cosine_mean,comparable_nn_mean_cosine,phase3_join_verified
+german,logistic_regression,200,200,200,0,57,True,CLEAN,margin_log_odds,8.88e-16,1.83e-16,0.9983,0.9985,0.954,1.0,0.9908,0.9909,0.9983,0.9984,0.5019,True
+german,xgboost,200,200,200,0,57,True,CLEAN,margin_log_odds,9.79e-07,2.67e-07,0.9757,0.9793,0.838,0.8,0.9173,0.9233,0.9745,0.9762,0.2045,True
+german,random_forest,200,200,200,0,57,True,CLEAN,probability_class_1,1.47e-15,5.65e-16,0.9652,0.9693,0.837,0.8,0.8891,0.8999,0.9636,0.9659,0.1353,True
+taiwan,logistic_regression,500,500,500,0,89,True,CLEAN,margin_log_odds,6.66e-16,1.67e-16,0.9996,0.9997,0.98,1.0,0.9832,0.9835,0.9996,0.9995,0.8187,True
+taiwan,xgboost,500,500,500,0,89,True,CLEAN,margin_log_odds,9.47e-07,3.39e-07,0.9787,0.9828,0.8864,0.8,0.8871,0.8907,0.9787,0.9787,0.4674,True
+taiwan,random_forest,500,500,500,0,89,True,CLEAN,probability_class_1,2.95e-11,3.51e-12,0.938,0.9458,0.7924,0.8,0.7768,0.7844,0.9371,0.9394,0.349,True

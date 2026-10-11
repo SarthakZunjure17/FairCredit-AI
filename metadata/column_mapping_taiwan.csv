@@ -1,0 +1,27 @@
+original_column,uci_code,standardized_column,role,dtype,description
+ID,None,id,identifier,int64,Unique client identifier (1 to 30000)
+LIMIT_BAL,X1,limit_bal,feature,float64,Amount of given credit in NT dollars (individual and family credit)
+SEX,X2,sex,candidate_protected_attribute,int64,"Gender: 1=Male, 2=Female"
+EDUCATION,X3,education,feature,int64,"Education level: 1=Graduate school, 2=University, 3=High school, 4=Others, 0/5/6=Undocumented"
+MARRIAGE,X4,marriage,candidate_protected_attribute,int64,"Marital status: 1=Married, 2=Single, 3=Others, 0=Undocumented"
+AGE,X5,age,candidate_protected_attribute,int64,Age in years (21 to 79)
+PAY_0,X6,pay_0,feature,int64,"Repayment status in September 2005 (-2=inactive, -1=paid duly, 0=revolving, 1-8=months delayed)"
+PAY_2,X7,pay_2,feature,int64,"Repayment status in August 2005 (-2=inactive, -1=paid duly, 0=revolving, 1-8=months delayed)"
+PAY_3,X8,pay_3,feature,int64,"Repayment status in July 2005 (-2=inactive, -1=paid duly, 0=revolving, 1-8=months delayed)"
+PAY_4,X9,pay_4,feature,int64,"Repayment status in June 2005 (-2=inactive, -1=paid duly, 0=revolving, 1-8=months delayed)"
+PAY_5,X10,pay_5,feature,int64,"Repayment status in May 2005 (-2=inactive, -1=paid duly, 0=revolving, 2-8=months delayed)"
+PAY_6,X11,pay_6,feature,int64,"Repayment status in April 2005 (-2=inactive, -1=paid duly, 0=revolving, 2-8=months delayed)"
+BILL_AMT1,X12,bill_amt1,feature,float64,Amount of bill statement in September 2005 (NT dollar)
+BILL_AMT2,X13,bill_amt2,feature,float64,Amount of bill statement in August 2005 (NT dollar)
+BILL_AMT3,X14,bill_amt3,feature,float64,Amount of bill statement in July 2005 (NT dollar)
+BILL_AMT4,X15,bill_amt4,feature,float64,Amount of bill statement in June 2005 (NT dollar)
+BILL_AMT5,X16,bill_amt5,feature,float64,Amount of bill statement in May 2005 (NT dollar)
+BILL_AMT6,X17,bill_amt6,feature,float64,Amount of bill statement in April 2005 (NT dollar)
+PAY_AMT1,X18,pay_amt1,feature,float64,Amount of previous payment in September 2005 (NT dollar)
+PAY_AMT2,X19,pay_amt2,feature,float64,Amount of previous payment in August 2005 (NT dollar)
+PAY_AMT3,X20,pay_amt3,feature,float64,Amount of previous payment in July 2005 (NT dollar)
+PAY_AMT4,X21,pay_amt4,feature,float64,Amount of previous payment in June 2005 (NT dollar)
+PAY_AMT5,X22,pay_amt5,feature,float64,Amount of previous payment in May 2005 (NT dollar)
+PAY_AMT6,X23,pay_amt6,feature,float64,Amount of previous payment in April 2005 (NT dollar)
+default payment next month,Y,original_target,target,int64,"Original default indicator: 1=default in October 2005, 0=non-default"
+default payment next month,Y,target,target,int64,"Standardized binary target: 1=Credit Default / Bad Risk, 0=No Default / Good Credit"

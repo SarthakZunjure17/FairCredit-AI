@@ -1,0 +1,23 @@
+column_name,role,data_type,unique_count,missing_count,missing_pct,min,max,mean,median,std,is_constant,is_near_constant,suspicious_notes
+checking_status,feature,object,4,0,0.0,,,,,,False,False,None
+duration_months,feature,int64,33,0,0.0,4.0,72.0,20.903,18.0,12.0588,False,False,None
+credit_history,feature,object,5,0,0.0,,,,,,False,False,None
+purpose,feature,object,10,0,0.0,,,,,,False,False,None
+credit_amount,feature,int64,921,0,0.0,250.0,18424.0,3271.258,2319.5,2822.7369,False,False,None
+savings_status,feature,object,5,0,0.0,,,,,,False,False,None
+employment_duration,feature,object,5,0,0.0,,,,,,False,False,None
+installment_rate,feature,int64,4,0,0.0,1.0,4.0,2.973,3.0,1.1187,False,False,None
+personal_status_sex,candidate_protected_attribute,object,4,0,0.0,,,,,,False,False,"Conflated sex & marital status. A92=Female (35.16% Bad), A91/A93/A94=Male (27.68% Bad)"
+other_debtors_guarantors,feature,object,3,0,0.0,,,,,,False,False,None
+present_residence_since,feature,int64,4,0,0.0,1.0,4.0,2.845,3.0,1.1037,False,False,None
+property,feature,object,4,0,0.0,,,,,,False,False,None
+age,candidate_protected_attribute,int64,53,0,0.0,19.0,75.0,35.546,33.0,11.3755,False,False,Candidate protected attribute: continuous (19-75). Young applicants (<=25) have 42.11% bad credit rate vs 27.16% for >25
+other_installment_plans,feature,object,3,0,0.0,,,,,,False,False,None
+housing,feature,object,3,0,0.0,,,,,,False,False,None
+existing_credits,feature,int64,4,0,0.0,1.0,4.0,1.407,1.0,0.5777,False,False,None
+job,feature,object,4,0,0.0,,,,,,False,False,None
+num_dependents,feature,int64,2,0,0.0,1.0,2.0,1.155,1.0,0.3621,False,False,None
+telephone,feature,object,2,0,0.0,,,,,,False,False,None
+foreign_worker,candidate_protected_attribute,object,2,0,0.0,,,,,,False,True,"Near-constant column: 96.3% single value; Candidate protected attribute: A201=Foreign worker (96.3%, 30.74% Bad), A202=Non-foreign (3.7%, 10.81% Bad)"
+original_target,target,int64,2,0,0.0,1.0,2.0,1.3,1.0,0.4585,False,False,None
+target,target,int64,2,0,0.0,0.0,1.0,0.3,0.0,0.4585,False,False,None

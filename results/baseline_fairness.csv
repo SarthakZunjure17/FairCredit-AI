@@ -1,0 +1,13 @@
+dataset,model,protected_attribute,equalized_odds_difference,equal_opportunity_difference,equal_opportunity_signed,demographic_parity_difference,demographic_parity_signed,disparate_impact,disparate_impact_approval_ratio,unprivileged_group,privileged_group,unprivileged_selection_rate,privileged_selection_rate,unprivileged_tpr,privileged_tpr,unprivileged_fpr,privileged_fpr
+taiwan,logistic_regression,sex,0.0194,0.0194,0.0194,0.0069,-0.0069,0.9433,1.0079,female,male,0.1151,0.122,0.3616,0.3422,0.0484,0.0549
+taiwan,logistic_regression,age,0.1061,0.1061,0.1061,0.0652,0.0652,0.6268,0.9268,<=25,>25,0.1747,0.1095,0.4439,0.3378,0.0823,0.0466
+taiwan,random_forest,sex,0.0298,0.0298,0.0298,0.0093,-0.0093,0.9296,1.0107,female,male,0.1223,0.1316,0.3721,0.3422,0.0547,0.0674
+taiwan,random_forest,age,0.141,0.141,0.141,0.0723,0.0723,0.6176,0.9182,<=25,>25,0.189,0.1168,0.4796,0.3386,0.0893,0.0556
+taiwan,xgboost,sex,0.0306,0.0306,0.0306,0.0027,-0.0027,0.9773,1.0031,female,male,0.1184,0.1211,0.3747,0.344,0.0491,0.0532
+taiwan,xgboost,age,0.1383,0.1383,0.1383,0.0768,0.0768,0.5883,0.9138,<=25,>25,0.1864,0.1097,0.4796,0.3413,0.0858,0.0458
+german,logistic_regression,sex,0.05,0.05,0.05,0.0577,0.0577,0.8046,0.9244,female,male,0.2951,0.2374,0.6,0.55,0.1463,0.1111
+german,logistic_regression,age,0.1049,0.025,-0.025,0.1393,0.1393,0.617,0.8204,<=25,>25,0.3636,0.2244,0.55,0.575,0.2083,0.1034
+german,random_forest,sex,0.125,0.125,0.125,0.062,0.062,0.7089,0.9269,female,male,0.2131,0.1511,0.5,0.375,0.0732,0.0606
+german,random_forest,age,0.1,0.1,-0.1,0.0152,0.0152,0.9167,0.9818,<=25,>25,0.1818,0.1667,0.35,0.45,0.0417,0.069
+german,xgboost,sex,0.025,0.025,-0.025,0.0157,0.0157,0.9362,0.9796,female,male,0.2459,0.2302,0.5,0.525,0.122,0.1111
+german,xgboost,age,0.1,0.1,-0.1,0.0484,0.0484,0.8226,0.9376,<=25,>25,0.2727,0.2244,0.45,0.55,0.125,0.1121
