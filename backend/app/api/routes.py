@@ -10,6 +10,8 @@ from backend.app.schemas.research import (
     ConfigurationsResponse,
     DatasetSchemaInfo,
     ConfigurationMetadata,
+    ResearchMatrixRow,
+    ShapSummaryRow,
     IndividualShapQueryResponse
 )
 from backend.app.services.model_service import model_service
@@ -87,9 +89,13 @@ def explain_risk(req: ExplanationRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/research/matrix")
+@router.get("/research/matrix", response_model=List[ResearchMatrixRow])
 def get_research_matrix():
     return research_service.get_research_matrix()
+
+@router.get("/research/qualitative-matrix")
+def get_qualitative_matrix():
+    return research_service.get_qualitative_matrix()
 
 @router.get("/research/mitigations")
 def get_mitigation_master():
@@ -99,7 +105,7 @@ def get_mitigation_master():
 def get_final_results():
     return research_service.get_final_research_results()
 
-@router.get("/research/shap-summary")
+@router.get("/research/shap-summary", response_model=List[ShapSummaryRow])
 def get_shap_summary():
     return research_service.get_shap_summary()
 

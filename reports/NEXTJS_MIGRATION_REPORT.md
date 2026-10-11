@@ -130,3 +130,9 @@ cd "D:\sarthak\Subjects\ERA\FairCredit AI\frontend"
 npm run dev -- -p 3000
 ```
 URL: `http://localhost:3000`
+
+---
+
+## 7. Runtime Issue Resolution (October 11, 2026)
+
+Detailed in eports/FRONTEND_RUNTIME_FIX_REPORT.md: Resolved data-boundary schema alignment for /api/research/matrix, joining master mitigation results with SHAP consistency metrics and adding defensive formatters to /fairness and /research pages. All routes verified operational.

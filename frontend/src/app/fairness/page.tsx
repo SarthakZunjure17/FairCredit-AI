@@ -28,8 +28,59 @@ import {
   DATASET_LABELS,
   MODEL_LABELS,
   MITIGATION_LABELS,
-  formatMetric
+  formatMetric,
+  formatModelLabel,
+  formatDatasetLabel,
+  formatMitigationLabel
 } from "@/lib/utils";
+
+function normalizeMatrixRecord(raw: any): ResearchMatrixRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const ds = (raw.dataset || raw.Dataset || "").toString().toLowerCase().trim();
+  const m = (raw.model || raw.Model || "").toString().toLowerCase().trim().replace(/[\s-]+/g, "_");
+  const mm = (raw.mitigation_method || raw.mitigation || raw.Mitigation || "").toString().toLowerCase().trim().replace(/[\s-]+/g, "_");
+
+  if (!ds || !m) return null;
+
+  return {
+    dataset: ds,
+    model: m,
+    mitigation_method: mm || "reweighing",
+    baseline_acc: typeof raw.baseline_acc === "number" ? raw.baseline_acc : parseFloat(raw.baseline_accuracy ?? raw.baseline_acc),
+    mitigated_acc: typeof raw.mitigated_acc === "number" ? raw.mitigated_acc : parseFloat(raw.mitigated_accuracy ?? raw.mitigated_acc),
+    delta_acc: typeof raw.delta_acc === "number" ? raw.delta_acc : parseFloat(raw.delta_accuracy ?? raw.delta_acc),
+    baseline_auc: typeof raw.baseline_auc === "number" ? raw.baseline_auc : parseFloat(raw.baseline_roc_auc ?? raw.baseline_auc),
+    mitigated_auc: raw.mitigated_auc !== undefined ? String(raw.mitigated_auc) : (raw.mitigated_roc_auc !== undefined ? String(raw.mitigated_roc_auc) : "N/A"),
+    delta_auc: raw.delta_auc !== undefined ? String(raw.delta_auc) : (raw.delta_roc_auc !== undefined ? String(raw.delta_roc_auc) : "N/A"),
+    baseline_eod: typeof raw.baseline_eod === "number" ? raw.baseline_eod : parseFloat(raw.baseline_eod),
+    mitigated_eod: typeof raw.mitigated_eod === "number" ? raw.mitigated_eod : parseFloat(raw.mitigated_eod),
+    delta_eod: typeof raw.delta_eod === "number" ? raw.delta_eod : parseFloat(raw.delta_eod),
+    baseline_dpd: typeof raw.baseline_dpd === "number" ? raw.baseline_dpd : parseFloat(raw.baseline_dpd),
+    mitigated_dpd: typeof raw.mitigated_dpd === "number" ? raw.mitigated_dpd : parseFloat(raw.mitigated_dpd),
+    delta_dpd: typeof raw.delta_dpd === "number" ? raw.delta_dpd : parseFloat(raw.delta_dpd),
+    shap_cosine_sim: typeof raw.shap_cosine_sim === "number" ? raw.shap_cosine_sim : (raw.cosine_mean ? parseFloat(raw.cosine_mean) : undefined),
+    shap_top5_overlap: typeof raw.shap_top5_overlap === "number" ? raw.shap_top5_overlap : (raw.top5_overlap_mean ? parseFloat(raw.top5_overlap_mean) : undefined),
+    shap_spearman_rank: typeof raw.shap_spearman_rank === "number" ? raw.shap_spearman_rank : (raw.rank_corr_mean ? parseFloat(raw.rank_corr_mean) : undefined)
+  };
+}
+
+function normalizeShapSummaryRecord(raw: any): ShapSummaryRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const ds = (raw.dataset || raw.Dataset || "").toString().toLowerCase().trim();
+  const m = (raw.model || raw.Model || "").toString().toLowerCase().trim().replace(/[\s-]+/g, "_");
+  if (!ds || !m) return null;
+
+  return {
+    dataset: ds,
+    model: m,
+    mean_cosine: typeof raw.mean_cosine === "number" ? raw.mean_cosine : parseFloat(raw.cosine_mean ?? raw.mean_cosine ?? 0),
+    ci95_cosine: raw.ci95_cosine || (raw.cosine_ci_95_low !== undefined ? `[${Number(raw.cosine_ci_95_low).toFixed(4)}, ${Number(raw.cosine_ci_95_high).toFixed(4)}]` : "N/A"),
+    mean_top5: typeof raw.mean_top5 === "number" ? raw.mean_top5 : parseFloat(raw.top5_overlap_mean ?? raw.mean_top5 ?? 0),
+    ci95_top5: raw.ci95_top5 || (raw.top5_overlap_ci_95_low !== undefined ? `[${Number(raw.top5_overlap_ci_95_low).toFixed(4)}, ${Number(raw.top5_overlap_ci_95_high).toFixed(4)}]` : "N/A"),
+    mean_rank: typeof raw.mean_rank === "number" ? raw.mean_rank : parseFloat(raw.rank_corr_mean ?? raw.mean_rank ?? 0),
+    ci95_rank: raw.ci95_rank || (raw.rank_corr_ci_95_low !== undefined ? `[${Number(raw.rank_corr_ci_95_low).toFixed(4)}, ${Number(raw.rank_corr_ci_95_high).toFixed(4)}]` : "N/A")
+  };
+}
 
 export default function FairnessPage() {
   const [matrixData, setMatrixData] = useState<ResearchMatrixRow[]>([]);
@@ -49,12 +100,22 @@ export default function FairnessPage() {
     async function loadResearch() {
       try {
         setIsLoading(true);
+        setErrorMessage(null);
         const [matrixRes, shapRes] = await Promise.all([
           api.getResearchMatrix(),
           api.getShapSummary()
         ]);
-        setMatrixData(matrixRes);
-        setShapSummaries(shapRes);
+        
+        const validMatrix = (Array.isArray(matrixRes) ? matrixRes : [])
+          .map(normalizeMatrixRecord)
+          .filter((r): r is ResearchMatrixRow => r !== null);
+          
+        const validShap = (Array.isArray(shapRes) ? shapRes : [])
+          .map(normalizeShapSummaryRecord)
+          .filter((s): s is ShapSummaryRow => s !== null);
+
+        setMatrixData(validMatrix);
+        setShapSummaries(validShap);
       } catch (err: any) {
         setErrorMessage(`Failed to load research tables: ${err.message}`);
       } finally {
@@ -77,20 +138,24 @@ export default function FairnessPage() {
     loadApplicantShap();
   }, [selectedDataset, selectedModel, applicantIdx]);
 
-  // Find matching row in matrix
-  const currentExp = matrixData.find(
-    (r) =>
-      r.dataset.toLowerCase() === selectedDataset &&
-      r.model.toLowerCase() === selectedModel &&
-      r.mitigation_method.toLowerCase() === selectedMitigation
-  );
+  // Safely find matching row in matrix
+  const currentExp = matrixData.find((r) => {
+    if (!r || typeof r.dataset !== "string" || typeof r.model !== "string") return false;
+    return (
+      r.dataset === selectedDataset &&
+      r.model === selectedModel &&
+      r.mitigation_method === selectedMitigation
+    );
+  });
 
-  // Find matching SHAP summary row
-  const currentShap = shapSummaries.find(
-    (s) =>
-      s.dataset.toLowerCase() === selectedDataset &&
-      s.model.toLowerCase() === selectedModel
-  );
+  // Safely find matching SHAP summary row
+  const currentShap = shapSummaries.find((s) => {
+    if (!s || typeof s.dataset !== "string" || typeof s.model !== "string") return false;
+    return (
+      s.dataset === selectedDataset &&
+      s.model === selectedModel
+    );
+  });
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto">
@@ -159,7 +224,7 @@ export default function FairnessPage() {
         </div>
 
         <div className="text-[11px] text-slate-500 font-medium">
-          Target Configuration: <span className="text-slate-900 font-semibold">{DATASET_LABELS[selectedDataset]} · {MODEL_LABELS[selectedModel]}</span>
+          Target Configuration: <span className="text-slate-900 font-semibold">{formatDatasetLabel(selectedDataset)} · {formatModelLabel(selectedModel)}</span>
         </div>
       </div>
 
@@ -171,7 +236,7 @@ export default function FairnessPage() {
               A. Model Performance & Group Fairness Audit
             </h2>
             <p className="text-xs text-slate-500">
-              Auditing empirical changes from baseline to {MITIGATION_LABELS[selectedMitigation]}.
+              Auditing empirical changes from baseline to {formatMitigationLabel(selectedMitigation)}.
             </p>
           </div>
           <span className="text-xs text-slate-400 font-mono">
@@ -181,100 +246,106 @@ export default function FairnessPage() {
           </span>
         </div>
 
-        {/* Two-Column Comparison: Performance vs Group Fairness */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Predictive Performance Card */}
-          <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-              <BarChart2 className="w-4 h-4 text-teal-700" />
-              <span>Predictive Performance Metrics</span>
-            </h3>
+        {currentExp ? (
+          /* Two-Column Comparison: Performance vs Group Fairness */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Predictive Performance Card */}
+            <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                <BarChart2 className="w-4 h-4 text-teal-700" />
+                <span>Predictive Performance Metrics</span>
+              </h3>
 
-            <div className="space-y-3">
-              {/* Classification Accuracy */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-semibold text-slate-800">Test Accuracy</span>
-                  <p className="text-[11px] text-slate-500">Higher is favorable (↑)</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono font-bold text-slate-900">
-                    {formatMetric(currentExp?.mitigated_acc)}
+              <div className="space-y-3">
+                {/* Classification Accuracy */}
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-800">Test Accuracy</span>
+                    <p className="text-[11px] text-slate-500">Higher is favorable (↑)</p>
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Baseline: {formatMetric(currentExp?.baseline_acc)}
+                  <div className="text-right">
+                    <div className="font-mono font-bold text-slate-900">
+                      {formatMetric(currentExp.mitigated_acc)}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Baseline: {formatMetric(currentExp.baseline_acc)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ROC-AUC */}
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-800">ROC-AUC Discrimination</span>
+                    <p className="text-[11px] text-slate-500">Continuous rank ordering (↑)</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono font-bold text-slate-900">
+                      {currentExp.mitigated_auc || "N/A"}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Baseline: {formatMetric(currentExp.baseline_auc)}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* ROC-AUC */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-semibold text-slate-800">ROC-AUC Discrimination</span>
-                  <p className="text-[11px] text-slate-500">Continuous rank ordering (↑)</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono font-bold text-slate-900">
-                    {currentExp?.mitigated_auc || "N/A"}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Baseline: {formatMetric(currentExp?.baseline_auc)}
-                  </div>
-                </div>
-              </div>
+              <p className="text-[11px] text-slate-500 leading-normal">
+                * Note: In compliance with strict auditing guidelines, ROC-AUC is reported as strictly <strong>N/A</strong> for ThresholdOptimizer and step predictions where binary thresholds discard score rank order.
+              </p>
             </div>
 
-            <p className="text-[11px] text-slate-500 leading-normal">
-              * Note: In compliance with strict auditing guidelines, ROC-AUC is reported as strictly <strong>N/A</strong> for ThresholdOptimizer and step predictions where binary thresholds discard score rank order.
-            </p>
-          </div>
+            {/* Group Fairness Disparities Card */}
+            <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                <Scale className="w-4 h-4 text-teal-700" />
+                <span>Group Fairness Disparity Metrics</span>
+              </h3>
 
-          {/* Group Fairness Disparities Card */}
-          <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-              <Scale className="w-4 h-4 text-teal-700" />
-              <span>Group Fairness Disparity Metrics</span>
-            </h3>
-
-            <div className="space-y-3">
-              {/* Equalized Odds Difference */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-semibold text-slate-800">Equalized Odds Difference (EOD)</span>
-                  <p className="text-[11px] text-slate-500">TPR/FPR gap between groups. Lower is favorable (↓)</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono font-bold text-slate-900">
-                    {formatMetric(currentExp?.mitigated_eod)}
+              <div className="space-y-3">
+                {/* Equalized Odds Difference */}
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-800">Equalized Odds Difference (EOD)</span>
+                    <p className="text-[11px] text-slate-500">TPR/FPR gap between groups. Lower is favorable (↓)</p>
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Baseline: {formatMetric(currentExp?.baseline_eod)}
+                  <div className="text-right">
+                    <div className="font-mono font-bold text-slate-900">
+                      {formatMetric(currentExp.mitigated_eod)}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Baseline: {formatMetric(currentExp.baseline_eod)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Demographic Parity Difference */}
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-semibold text-slate-800">Demographic Parity Diff (DPD)</span>
+                    <p className="text-[11px] text-slate-500">Approval rate gap. Lower is favorable (↓)</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono font-bold text-slate-900">
+                      {formatMetric(currentExp.mitigated_dpd)}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Baseline: {formatMetric(currentExp.baseline_dpd)}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Demographic Parity Difference */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-                <div>
-                  <span className="font-semibold text-slate-800">Demographic Parity Diff (DPD)</span>
-                  <p className="text-[11px] text-slate-500">Approval rate gap. Lower is favorable (↓)</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono font-bold text-slate-900">
-                    {formatMetric(currentExp?.mitigated_dpd)}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Baseline: {formatMetric(currentExp?.baseline_dpd)}
-                  </div>
-                </div>
-              </div>
+              <p className="text-[11px] text-slate-500 leading-normal">
+                A reduction in disparity metrics (EOD / DPD) indicates progress toward parity between demographic groups, but must be evaluated alongside predictive utility.
+              </p>
             </div>
-
-            <p className="text-[11px] text-slate-500 leading-normal">
-              A reduction in disparity metrics (EOD / DPD) indicates progress toward parity between demographic groups, but must be evaluated alongside predictive utility.
-            </p>
           </div>
-        </div>
+        ) : (
+          <div className="p-8 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
+            {isLoading ? "Loading authoritative research metrics…" : "No empirical metrics found for this configuration."}
+          </div>
+        )}
       </div>
 
       {/* SECTION B: EXPLANATION STABILITY */}
@@ -343,12 +414,12 @@ export default function FairnessPage() {
           {individualShap?.attributions && individualShap.attributions.length > 0 ? (
             <ShapBarChart
               data={individualShap.attributions.map((a) => ({
-                feature: a.feature,
-                feature_raw: a.feature,
-                baseline_shap: a.baseline_shap,
-                reweighed_shap: a.reweighed_shap,
-                diff_shap: a.diff_shap,
-                direction: a.baseline_shap > 0 ? "increases_risk" : "reduces_risk"
+                feature: a.feature || "Unknown Feature",
+                feature_raw: a.feature || "",
+                baseline_shap: typeof a.baseline_shap === "number" ? a.baseline_shap : 0,
+                reweighed_shap: typeof a.reweighed_shap === "number" ? a.reweighed_shap : 0,
+                diff_shap: typeof a.diff_shap === "number" ? a.diff_shap : 0,
+                direction: (a.baseline_shap ?? 0) > 0 ? "increases_risk" : "reduces_risk"
               }))}
               title={`Held-Out Applicant #${applicantIdx} — Baseline vs. Reweighed SHAP Attributions`}
             />

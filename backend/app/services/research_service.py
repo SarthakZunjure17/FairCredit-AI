@@ -45,7 +45,22 @@ class ResearchDataService:
         if "shap_summary" not in self._cache:
             path = os.path.join(self.results_dir, "shap_summary.csv")
             df = pd.read_csv(path)
-            self._cache["shap_summary"] = df.to_dict(orient="records")
+            df["dataset"] = df["dataset"].str.lower().str.strip()
+            df["model"] = df["model"].str.lower().str.strip()
+            
+            records = []
+            for _, r in df.iterrows():
+                records.append({
+                    "dataset": str(r["dataset"]).lower().strip(),
+                    "model": str(r["model"]).lower().strip(),
+                    "mean_cosine": round(float(r["cosine_mean"]), 4),
+                    "ci95_cosine": f"[{r['cosine_ci_95_low']:.4f}, {r['cosine_ci_95_high']:.4f}]",
+                    "mean_top5": round(float(r["top5_overlap_mean"]), 4),
+                    "ci95_top5": f"[{r['top5_overlap_ci_95_low']:.4f}, {r['top5_overlap_ci_95_high']:.4f}]",
+                    "mean_rank": round(float(r["rank_corr_mean"]), 4),
+                    "ci95_rank": f"[{r['rank_corr_ci_95_low']:.4f}, {r['rank_corr_ci_95_high']:.4f}]"
+                })
+            self._cache["shap_summary"] = records
         return self._cache["shap_summary"]
 
     def get_shap_group_metrics(self) -> List[Dict[str, Any]]:
@@ -56,11 +71,62 @@ class ResearchDataService:
         return self._cache["shap_groups"]
 
     def get_research_matrix(self) -> List[Dict[str, Any]]:
+        """
+        Builds the complete quantitative research matrix for all 18 mitigation experiments,
+        joined with SHAP explanation consistency metrics from authoritative sources.
+        """
         if "matrix" not in self._cache:
-            path = os.path.join(self.results_dir, "fairness_performance_explanation_matrix.csv")
-            df = pd.read_csv(path, keep_default_na=False)
-            self._cache["matrix"] = df.to_dict(orient="records")
+            mit_path = os.path.join(self.results_dir, "mitigation_master_results.csv")
+            shap_path = os.path.join(self.results_dir, "shap_summary.csv")
+
+            df_mit = pd.read_csv(mit_path, keep_default_na=False)
+            df_shap = pd.read_csv(shap_path)
+
+            df_mit["dataset"] = df_mit["dataset"].str.lower().str.strip()
+            df_mit["model"] = df_mit["model"].str.lower().str.strip()
+            df_mit["mitigation_method"] = df_mit["mitigation_method"].str.lower().str.strip()
+
+            df_shap["dataset"] = df_shap["dataset"].str.lower().str.strip()
+            df_shap["model"] = df_shap["model"].str.lower().str.strip()
+
+            shap_map = {(r["dataset"], r["model"]): r for _, r in df_shap.iterrows()}
+
+            matrix_rows = []
+            for _, r in df_mit.iterrows():
+                ds = str(r["dataset"]).lower().strip()
+                m = str(r["model"]).lower().strip()
+                mm = str(r["mitigation_method"]).lower().strip()
+                shap_info = shap_map.get((ds, m)) if mm == "reweighing" else None
+
+                matrix_rows.append({
+                    "dataset": ds,
+                    "model": m,
+                    "mitigation_method": mm,
+                    "baseline_acc": float(r["baseline_accuracy"]),
+                    "mitigated_acc": float(r["mitigated_accuracy"]),
+                    "delta_acc": float(r["delta_accuracy"]),
+                    "baseline_auc": float(r["baseline_roc_auc"]),
+                    "mitigated_auc": str(r["mitigated_roc_auc"]),
+                    "delta_auc": str(r["delta_roc_auc"]),
+                    "baseline_eod": float(r["baseline_eod"]),
+                    "mitigated_eod": float(r["mitigated_eod"]),
+                    "delta_eod": float(r["delta_eod"]),
+                    "baseline_dpd": float(r["baseline_dpd"]),
+                    "mitigated_dpd": float(r["mitigated_dpd"]),
+                    "delta_dpd": float(r["delta_dpd"]),
+                    "shap_cosine_sim": round(float(shap_info["cosine_mean"]), 4) if shap_info is not None else None,
+                    "shap_top5_overlap": round(float(shap_info["top5_overlap_mean"]), 4) if shap_info is not None else None,
+                    "shap_spearman_rank": round(float(shap_info["rank_corr_mean"]), 4) if shap_info is not None else None,
+                })
+
+            self._cache["matrix"] = matrix_rows
         return self._cache["matrix"]
+
+    def get_qualitative_matrix(self) -> List[Dict[str, Any]]:
+        """Returns the high-level qualitative observations matrix."""
+        path = os.path.join(self.results_dir, "fairness_performance_explanation_matrix.csv")
+        df = pd.read_csv(path, keep_default_na=False)
+        return df.to_dict(orient="records")
 
     def get_individual_shap_records(
         self,

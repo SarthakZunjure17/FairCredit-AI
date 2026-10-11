@@ -15,7 +15,12 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { ResearchMatrixRow, ShapSummaryRow } from "@/types";
-import { formatMetric } from "@/lib/utils";
+import {
+  formatMetric,
+  formatModelLabel,
+  formatDatasetLabel,
+  formatMitigationLabel
+} from "@/lib/utils";
 
 interface SectionProps {
   id: string;
@@ -40,6 +45,36 @@ function ExpandableSection({ id, title, isOpen, onToggle, children }: SectionPro
   );
 }
 
+function normalizeMatrixRecord(raw: any): ResearchMatrixRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const ds = (raw.dataset || raw.Dataset || "").toString().toLowerCase().trim();
+  const m = (raw.model || raw.Model || "").toString().toLowerCase().trim().replace(/[\s-]+/g, "_");
+  const mm = (raw.mitigation_method || raw.mitigation || raw.Mitigation || "").toString().toLowerCase().trim().replace(/[\s-]+/g, "_");
+
+  if (!ds || !m) return null;
+
+  return {
+    dataset: ds,
+    model: m,
+    mitigation_method: mm || "reweighing",
+    baseline_acc: typeof raw.baseline_acc === "number" ? raw.baseline_acc : parseFloat(raw.baseline_accuracy ?? raw.baseline_acc),
+    mitigated_acc: typeof raw.mitigated_acc === "number" ? raw.mitigated_acc : parseFloat(raw.mitigated_accuracy ?? raw.mitigated_acc),
+    delta_acc: typeof raw.delta_acc === "number" ? raw.delta_acc : parseFloat(raw.delta_accuracy ?? raw.delta_acc),
+    baseline_auc: typeof raw.baseline_auc === "number" ? raw.baseline_auc : parseFloat(raw.baseline_roc_auc ?? raw.baseline_auc),
+    mitigated_auc: raw.mitigated_auc !== undefined ? String(raw.mitigated_auc) : (raw.mitigated_roc_auc !== undefined ? String(raw.mitigated_roc_auc) : "N/A"),
+    delta_auc: raw.delta_auc !== undefined ? String(raw.delta_auc) : (raw.delta_roc_auc !== undefined ? String(raw.delta_roc_auc) : "N/A"),
+    baseline_eod: typeof raw.baseline_eod === "number" ? raw.baseline_eod : parseFloat(raw.baseline_eod),
+    mitigated_eod: typeof raw.mitigated_eod === "number" ? raw.mitigated_eod : parseFloat(raw.mitigated_eod),
+    delta_eod: typeof raw.delta_eod === "number" ? raw.delta_eod : parseFloat(raw.delta_eod),
+    baseline_dpd: typeof raw.baseline_dpd === "number" ? raw.baseline_dpd : parseFloat(raw.baseline_dpd),
+    mitigated_dpd: typeof raw.mitigated_dpd === "number" ? raw.mitigated_dpd : parseFloat(raw.mitigated_dpd),
+    delta_dpd: typeof raw.delta_dpd === "number" ? raw.delta_dpd : parseFloat(raw.delta_dpd),
+    shap_cosine_sim: typeof raw.shap_cosine_sim === "number" ? raw.shap_cosine_sim : (raw.cosine_mean ? parseFloat(raw.cosine_mean) : undefined),
+    shap_top5_overlap: typeof raw.shap_top5_overlap === "number" ? raw.shap_top5_overlap : (raw.top5_overlap_mean ? parseFloat(raw.top5_overlap_mean) : undefined),
+    shap_spearman_rank: typeof raw.shap_spearman_rank === "number" ? raw.shap_spearman_rank : (raw.rank_corr_mean ? parseFloat(raw.rank_corr_mean) : undefined)
+  };
+}
+
 export default function ResearchPage() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     s1: true,
@@ -47,19 +82,21 @@ export default function ResearchPage() {
     s10: true
   });
   const [matrixData, setMatrixData] = useState<ResearchMatrixRow[]>([]);
-  const [shapSummaries, setShapSummaries] = useState<ShapSummaryRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [matrixRes, shapRes] = await Promise.all([
-          api.getResearchMatrix(),
-          api.getShapSummary()
-        ]);
-        setMatrixData(matrixRes);
-        setShapSummaries(shapRes);
+        setIsLoading(true);
+        const matrixRes = await api.getResearchMatrix();
+        const validMatrix = (Array.isArray(matrixRes) ? matrixRes : [])
+          .map(normalizeMatrixRecord)
+          .filter((r): r is ResearchMatrixRow => r !== null);
+        setMatrixData(validMatrix);
       } catch (e) {
         console.error("Research page data load error:", e);
+      } finally {
+        setIsLoading(false);
       }
     }
     loadData();
@@ -209,9 +246,9 @@ export default function ResearchPage() {
             <strong>Consistency Metrics:</strong>
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong>Cosine Similarity:</strong> Measures direction and angle alignment of attribution vectors in feature space.</li>
+            <li><strong>Cosine Similarity:</strong> Measures directional attribution alignment in multidimensional space.</li>
             <li><strong>Top-5 Feature Overlap:</strong> Jaccard set intersection of the 5 highest-magnitude features.</li>
-            <li><strong>Spearman Rank Correlation:</strong> Preservation of relative feature importance rankings.</li>
+            <li><strong>Spearman Rank Correlation:</strong> Monotonic rank preservation across all features.</li>
           </ul>
         </ExpandableSection>
 
@@ -261,7 +298,7 @@ export default function ResearchPage() {
           </div>
         </ExpandableSection>
 
-        {/* Section 10: Complete Verified Research Matrix Table */}
+        {/* Section 9: Complete Verified Research Matrix Table */}
         <ExpandableSection
           id="s10"
           title="9. Complete Verified Research Results Table"
@@ -269,45 +306,61 @@ export default function ResearchPage() {
           onToggle={() => toggleSection("s10")}
         >
           <p className="text-[11px] text-slate-500">
-            Authoritative results joined from <code>results/fairness_performance_explanation_matrix.csv</code> and <code>results/shap_summary.csv</code>.
+            Authoritative results joined from <code>results/mitigation_master_results.csv</code> (18 experiments) and <code>results/shap_summary.csv</code> (explanation consistency).
           </p>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full text-left text-[11px] border-collapse">
-              <thead>
-                <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
-                  <th className="p-2.5">Dataset</th>
-                  <th className="p-2.5">Model</th>
-                  <th className="p-2.5">Mitigation</th>
-                  <th className="p-2.5 text-right">Acc (Base)</th>
-                  <th className="p-2.5 text-right">Acc (Mit)</th>
-                  <th className="p-2.5 text-right">AUC (Base)</th>
-                  <th className="p-2.5 text-right">AUC (Mit)</th>
-                  <th className="p-2.5 text-right">EOD (Base)</th>
-                  <th className="p-2.5 text-right">EOD (Mit)</th>
-                  <th className="p-2.5 text-right">SHAP Cosine</th>
-                  <th className="p-2.5 text-right">Top-5 Overlap</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {matrixData.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/70 font-mono">
-                    <td className="p-2.5 font-sans font-medium capitalize text-slate-900">{row.dataset}</td>
-                    <td className="p-2.5 font-sans text-slate-700 capitalize">{row.model.replace(/_/g, " ")}</td>
-                    <td className="p-2.5 font-sans text-teal-800 font-semibold capitalize">{row.mitigation_method.replace(/_/g, " ")}</td>
-                    <td className="p-2.5 text-right">{formatMetric(row.baseline_acc)}</td>
-                    <td className="p-2.5 text-right">{formatMetric(row.mitigated_acc)}</td>
-                    <td className="p-2.5 text-right">{formatMetric(row.baseline_auc)}</td>
-                    <td className="p-2.5 text-right">{row.mitigated_auc || "N/A"}</td>
-                    <td className="p-2.5 text-right">{formatMetric(row.baseline_eod)}</td>
-                    <td className="p-2.5 text-right font-bold text-teal-700">{formatMetric(row.mitigated_eod)}</td>
-                    <td className="p-2.5 text-right text-indigo-700">{row.shap_cosine_sim ? formatMetric(row.shap_cosine_sim) : "N/A"}</td>
-                    <td className="p-2.5 text-right text-slate-600">{row.shap_top5_overlap ? formatMetric(row.shap_top5_overlap) : "N/A"}</td>
+          {matrixData.length > 0 ? (
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full text-left text-[11px] border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                    <th className="p-2.5">Dataset</th>
+                    <th className="p-2.5">Model</th>
+                    <th className="p-2.5">Mitigation</th>
+                    <th className="p-2.5 text-right">Acc (Base)</th>
+                    <th className="p-2.5 text-right">Acc (Mit)</th>
+                    <th className="p-2.5 text-right">AUC (Base)</th>
+                    <th className="p-2.5 text-right">AUC (Mit)</th>
+                    <th className="p-2.5 text-right">EOD (Base)</th>
+                    <th className="p-2.5 text-right">EOD (Mit)</th>
+                    <th className="p-2.5 text-right">SHAP Cosine</th>
+                    <th className="p-2.5 text-right">Top-5 Overlap</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {matrixData.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/70 font-mono">
+                      <td className="p-2.5 font-sans font-medium capitalize text-slate-900">
+                        {formatDatasetLabel(row.dataset)}
+                      </td>
+                      <td className="p-2.5 font-sans text-slate-700 capitalize">
+                        {formatModelLabel(row.model)}
+                      </td>
+                      <td className="p-2.5 font-sans text-teal-800 font-semibold capitalize">
+                        {formatMitigationLabel(row.mitigation_method)}
+                      </td>
+                      <td className="p-2.5 text-right">{formatMetric(row.baseline_acc)}</td>
+                      <td className="p-2.5 text-right">{formatMetric(row.mitigated_acc)}</td>
+                      <td className="p-2.5 text-right">{formatMetric(row.baseline_auc)}</td>
+                      <td className="p-2.5 text-right">{row.mitigated_auc || "N/A"}</td>
+                      <td className="p-2.5 text-right">{formatMetric(row.baseline_eod)}</td>
+                      <td className="p-2.5 text-right font-bold text-teal-700">{formatMetric(row.mitigated_eod)}</td>
+                      <td className="p-2.5 text-right text-indigo-700">
+                        {row.shap_cosine_sim !== undefined && row.shap_cosine_sim !== null ? formatMetric(row.shap_cosine_sim) : "N/A"}
+                      </td>
+                      <td className="p-2.5 text-right text-slate-600">
+                        {row.shap_top5_overlap !== undefined && row.shap_top5_overlap !== null ? formatMetric(row.shap_top5_overlap) : "N/A"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-6 text-center text-xs text-slate-400 italic bg-slate-50 rounded-lg">
+              {isLoading ? "Loading verified research matrix records…" : "No research records available."}
+            </div>
+          )}
         </ExpandableSection>
       </div>
     </div>
