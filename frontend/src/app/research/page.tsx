@@ -926,7 +926,7 @@ export default function ResearchPage() {
               {activeChartMetric === "shap" && (
                 <p>
                   <strong>SHAP Consistency Interpretation:</strong> Evaluates whether fairness mitigation destabilizes local feature attribution.
-                  Linear models exhibit near-unity vector alignment (cosine 0.9996 / 0.9983), while tree ensembles show feature ranking re-orderings (top-5 overlap 0.90–0.98).
+                  Linear models exhibit near-unity vector alignment (cosine 0.9996 / 0.9983) and high top-5 overlap (0.95–0.98), while tree ensembles show feature ranking shifts with top-5 overlap between 0.79 and 0.89.
                 </p>
               )}
             </div>

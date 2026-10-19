@@ -237,3 +237,62 @@ def test_final_research_invalid_filters():
     resp_bad_m = client.get("/api/research/final-results?model=neural_network")
     assert resp_bad_m.status_code == 400
     assert "Invalid model" in resp_bad_m.json()["detail"]
+
+
+def test_feature_validation_invalid_bounds():
+    cfg_resp = client.get("/api/configurations").json()
+    german_sample = dict(cfg_resp["dataset_schemas"]["german"]["sample_applicants"]["applicant_a_low_risk"])
+
+    # Negative credit amount
+    bad_amount = dict(german_sample, credit_amount=-500)
+    resp = client.post("/api/predict", json={"dataset": "german", "model": "random_forest", "features": bad_amount})
+    assert resp.status_code == 400
+    assert "strictly positive" in resp.json()["detail"]
+
+    # Underage applicant (< 18)
+    bad_age = dict(german_sample, age=12)
+    resp = client.post("/api/predict", json={"dataset": "german", "model": "random_forest", "features": bad_age})
+    assert resp.status_code == 400
+    assert "between 18 and 120" in resp.json()["detail"]
+
+    # Invalid categorical value
+    bad_cat = dict(german_sample, checking_status="INVALID_CODE_99")
+    resp = client.post("/api/predict", json={"dataset": "german", "model": "random_forest", "features": bad_cat})
+    assert resp.status_code == 400
+    assert "invalid" in resp.json()["detail"].lower()
+
+def test_explanation_to_prediction_consistency():
+    cfg_resp = client.get("/api/configurations").json()
+    sample = cfg_resp["dataset_schemas"]["german"]["sample_applicants"]["applicant_a_low_risk"]
+
+    payload = {"dataset": "german", "model": "random_forest", "features": sample}
+    pred_resp = client.post("/api/predict", json=payload)
+    exp_resp = client.post("/api/explain", json=payload)
+
+    assert pred_resp.status_code == 200
+    assert exp_resp.status_code == 200
+
+    pred_data = pred_resp.json()
+    exp_data = exp_resp.json()
+
+    # Exact probability consistency between prediction and explanation
+    assert abs(exp_data["baseline_probability"] - pred_data["baseline"]["default_probability"]) < 1e-4
+    assert abs(exp_data["reweighed_probability"] - pred_data["reweighed"]["default_probability"]) < 1e-4
+
+    # Explainer method metadata
+    assert exp_data["explainer_method"] == "TreeExplainer"
+    assert pred_data["baseline"]["is_calibrated"] is False
+    assert "uncalibrated" in pred_data["baseline"]["score_meaning"].lower()
+
+def test_explain_logistic_regression_linear_explainer():
+    cfg_resp = client.get("/api/configurations").json()
+    sample = cfg_resp["dataset_schemas"]["taiwan"]["sample_applicants"]["applicant_a_low_risk"]
+
+    payload = {"dataset": "taiwan", "model": "logistic_regression", "features": sample}
+    exp_resp = client.post("/api/explain", json=payload)
+    assert exp_resp.status_code == 200
+    exp_data = exp_resp.json()
+
+    assert exp_data["explainer_method"] == "LinearExplainer"
+    assert "Margin" in exp_data["output_space"] or "Log-Odds" in exp_data["output_space"]
+    assert len(exp_data["top_contributors"]) > 0

@@ -16,6 +16,11 @@ class PredictionModelOutput(BaseModel):
     model_type: str = Field(..., description="Model name")
     mitigation_type: str = Field(..., description="'baseline' or 'reweighed'")
     output_space: str = Field(..., description="Model prediction space")
+    is_calibrated: bool = Field(False, description="Whether probability calibration (e.g. isotonic/Platt) was verified")
+    score_meaning: str = Field(
+        "Estimated model risk score P(Y=1|X) under research test distribution. Uncalibrated research output, not a credit bureau score or lending decision.",
+        description="Explanation of what the score represents and its auditing context"
+    )
 
 class PredictionDelta(BaseModel):
     probability_difference: float = Field(..., description="reweighed_prob - baseline_prob")
@@ -48,6 +53,7 @@ class ExplanationResponse(BaseModel):
     dataset: str
     model: str
     output_space: str
+    explainer_method: Optional[str] = Field("TreeExplainer", description="SHAP explainer algorithm (e.g., TreeExplainer, LinearExplainer)")
     baseline_probability: float
     reweighed_probability: float
     top_contributors: List[FeatureAttribution]

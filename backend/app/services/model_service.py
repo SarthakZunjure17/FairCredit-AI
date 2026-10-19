@@ -22,6 +22,49 @@ from backend.app.schemas.assessment import (
 
 from backend.app.services.feature_dictionary import format_feature_label
 class ModelInferenceService:
+    def validate_features(self, dataset: str, features: Dict[str, Any]) -> None:
+        if not isinstance(features, dict):
+            raise ValueError("Applicant features must be provided as a key-value dictionary.")
+        if len(features) == 0:
+            raise ValueError("Applicant feature payload cannot be empty.")
+            
+        manifest = self.get_manifest()
+        if dataset not in manifest["datasets"]:
+            raise ValueError(f"Unsupported dataset '{dataset}'. Supported datasets: {list(manifest['datasets'].keys())}")
+            
+        ds_meta = manifest["datasets"][dataset]
+        num_ranges = ds_meta.get("numerical_ranges", {})
+        cat_values = ds_meta.get("categorical_unique_values", {})
+        
+        errors = []
+        for k, v in features.items():
+            if k in num_ranges:
+                try:
+                    num_val = float(v)
+                except (ValueError, TypeError):
+                    errors.append(f"Field '{k}' must be a valid number, got '{v}'")
+                    continue
+                # Physical/logical bounds validation
+                if k in ("duration_months", "credit_amount", "limit_bal") and num_val <= 0:
+                    errors.append(f"Field '{k}' must be strictly positive, got {num_val}")
+                elif k == "age" and (num_val < 18 or num_val > 120):
+                    errors.append(f"Field 'age' must be between 18 and 120 years, got {num_val}")
+                elif k in ("pay_0", "pay_2", "pay_3", "pay_4", "pay_5", "pay_6") and (num_val < -2 or num_val > 10):
+                    errors.append(f"Taiwan payment status '{k}' must be between -2 and 10, got {num_val}")
+            elif k in cat_values:
+                allowed = set(cat_values[k])
+                try:
+                    f_val = float(v)
+                    str_v = str(int(f_val)) if f_val.is_integer() else str(v)
+                except (ValueError, TypeError):
+                    str_v = str(v)
+
+                if str_v not in allowed and str(v) not in allowed:
+                    errors.append(f"Field '{k}' value '{v}' is invalid. Allowed values: {sorted(list(allowed))}")
+                    
+        if errors:
+            raise ValueError("; ".join(errors))
+
     def __init__(self):
         self.models_dir = os.path.join(project_root, "models")
         self._models: Dict[str, Any] = {}
@@ -101,6 +144,7 @@ class ModelInferenceService:
         ds = dataset.lower().strip()
         m = model.lower().strip()
 
+        self.validate_features(ds, features)
         df_input = self._prepare_dataframe(ds, features)
 
         pipe_base = self._get_pipeline(ds, m, "baseline")
@@ -170,6 +214,7 @@ class ModelInferenceService:
         ds = dataset.lower().strip()
         m = model.lower().strip()
 
+        self.validate_features(ds, features)
         df_input = self._prepare_dataframe(ds, features)
 
         pipe_base = self._get_pipeline(ds, m, "baseline")
@@ -229,10 +274,12 @@ class ModelInferenceService:
             f"and '{top_10[1].feature}' (baseline SHAP: {top_10[1].baseline_shap:+.4f})."
         )
 
+        explainer_algo = "LinearExplainer" if m == "logistic_regression" else "TreeExplainer"
         return ExplanationResponse(
             dataset=ds,
             model=m,
             output_space=output_space_desc,
+            explainer_method=explainer_algo,
             baseline_probability=round(prob_base, 4),
             reweighed_probability=round(prob_rew, 4),
             top_contributors=top_10,

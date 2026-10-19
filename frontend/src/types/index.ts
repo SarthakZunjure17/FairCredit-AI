@@ -9,6 +9,8 @@ export interface PredictionModelOutput {
   model_type: string;
   mitigation_type: string;
   output_space: string;
+  is_calibrated?: boolean;
+  score_meaning?: string;
 }
 
 export interface PredictionDelta {
@@ -40,6 +42,7 @@ export interface ExplanationResponse {
   dataset: string;
   model: string;
   output_space: string;
+  explainer_method?: string;
   baseline_probability: number;
   reweighed_probability: number;
   top_contributors: FeatureAttribution[];

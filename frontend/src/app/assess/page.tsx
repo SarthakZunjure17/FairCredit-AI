@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   BarChart3,
   Sparkles,
@@ -8,10 +8,18 @@ import {
   AlertCircle,
   TrendingDown,
   TrendingUp,
+  Minus,
   Layers,
   ArrowRight,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Info,
+  Sliders,
+  Scale,
+  Activity,
+  HelpCircle,
+  AlertTriangle,
+  ArrowUpDown
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -21,14 +29,14 @@ import {
   DatasetKey,
   ModelKey
 } from "@/types";
-import { MetricCard } from "@/components/MetricCard";
 import { ShapBarChart } from "@/components/ShapBarChart";
 import {
   DATASET_LABELS,
   MODEL_LABELS,
   formatPercent,
   formatDatasetLabel,
-  formatModelLabel
+  formatModelLabel,
+  formatFeatureLabel
 } from "@/lib/utils";
 
 export default function AssessPage() {
@@ -36,11 +44,13 @@ export default function AssessPage() {
   const [selectedDataset, setSelectedDataset] = useState<DatasetKey>("german");
   const [selectedModel, setSelectedModel] = useState<ModelKey>("random_forest");
   const [features, setFeatures] = useState<Record<string, any>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   
   const [isLoading, setIsLoading] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState<AssessmentResponse | null>(null);
   const [explanationResult, setExplanationResult] = useState<ExplanationResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeExplanationView, setActiveExplanationView] = useState<"chart" | "reranking_table">("chart");
 
   // Load backend configurations & metadata on mount
   useEffect(() => {
@@ -66,6 +76,7 @@ export default function AssessPage() {
     setAssessmentResult(null);
     setExplanationResult(null);
     setErrorMessage(null);
+    setValidationErrors({});
     if (configData?.dataset_schemas[newDs]) {
       const sample = configData.dataset_schemas[newDs].sample_applicants?.applicant_a_low_risk || {};
       setFeatures(sample);
@@ -81,12 +92,55 @@ export default function AssessPage() {
         setAssessmentResult(null);
         setExplanationResult(null);
         setErrorMessage(null);
+        setValidationErrors({});
       }
     }
   };
 
+  // In-line field validation
+  const validateField = (key: string, val: any): string | null => {
+    if (selectedDataset === "german") {
+      if (key === "duration_months") {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < 4 || num > 72) return "Duration must be between 4 and 72 months.";
+      } else if (key === "credit_amount") {
+        const num = parseFloat(val);
+        if (isNaN(num) || num <= 0) return "Credit amount must be strictly positive.";
+      } else if (key === "age") {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < 18 || num > 120) return "Age must be between 18 and 120 years.";
+      } else if (key === "installment_rate") {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < 1 || num > 4) return "Installment rate must be between 1 and 4.";
+      }
+    } else if (selectedDataset === "taiwan") {
+      if (key === "limit_bal") {
+        const num = parseFloat(val);
+        if (isNaN(num) || num <= 0) return "Credit limit must be strictly positive.";
+      } else if (key === "age") {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < 18 || num > 120) return "Age must be between 18 and 120 years.";
+      } else if (key.startsWith("pay_") && !key.startsWith("pay_amt")) {
+        const num = parseInt(val);
+        if (isNaN(num) || num < -2 || num > 8) return "Pay status must be between -2 and 8.";
+      }
+    }
+    return null;
+  };
+
   // Update individual feature input
   const handleFeatureChange = (key: string, val: any) => {
+    const error = validateField(key, val);
+    setValidationErrors((prev) => {
+      const updated = { ...prev };
+      if (error) {
+        updated[key] = error;
+      } else {
+        delete updated[key];
+      }
+      return updated;
+    });
+
     setFeatures((prev) => ({
       ...prev,
       [key]: val
@@ -96,6 +150,13 @@ export default function AssessPage() {
   // Run assessment & local SHAP explanation
   const handleRunAssessment = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    // Check for existing validation errors
+    if (Object.keys(validationErrors).length > 0) {
+      setErrorMessage("Please correct the highlighted input validation errors before running assessment.");
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -116,20 +177,69 @@ export default function AssessPage() {
     }
   };
 
+  // Compute feature re-ranking differences for the explanation table
+  const featureRankingDiffs = useMemo(() => {
+    if (!explanationResult || !explanationResult.top_contributors) return [];
+
+    return explanationResult.top_contributors.map((item, index) => {
+      const bShap = item.baseline_shap;
+      const rShap = item.reweighed_shap;
+      const diffShap = item.diff_shap;
+      const bSign = bShap > 0.001 ? "Increases Risk (+)" : bShap < -0.001 ? "Reduces Risk (-)" : "Neutral";
+      const rSign = rShap > 0.001 ? "Increases Risk (+)" : rShap < -0.001 ? "Reduces Risk (-)" : "Neutral";
+      const signFlipped = (bShap > 0.001 && rShap < -0.001) || (bShap < -0.001 && rShap > 0.001);
+
+      return {
+        rank: index + 1,
+        featureName: formatFeatureLabel(item.feature),
+        rawFeature: item.feature_raw || item.feature,
+        baselineShap: bShap,
+        reweighedShap: rShap,
+        diffShap: diffShap,
+        baselineSign: bSign,
+        reweighedSign: rSign,
+        signFlipped,
+        absShift: Math.abs(diffShap)
+      };
+    });
+  }, [explanationResult]);
+
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto pb-12">
       {/* Page Header */}
-      <div>
-        <div className="flex items-center space-x-2 text-xs font-semibold text-teal-800 uppercase tracking-wider">
-          <BarChart3 className="w-4 h-4 text-teal-600" />
-          <span>Experience A</span>
+      <div className="border-b border-slate-200 pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-2 text-xs font-semibold text-teal-800 uppercase tracking-wider">
+            <BarChart3 className="w-4 h-4 text-teal-600" />
+            <span>Applicant Explanation Studio · Stage 2</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+              <Activity className="w-3.5 h-3.5 text-sky-600" />
+              <span>Live Inference &amp; Local SHAP</span>
+            </span>
+            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
+              <span>Seed 42 Pipeline</span>
+            </span>
+          </div>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
-          Interactive Credit Risk Assessment
+
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-2">
+          Applicant Credit Risk &amp; Explanation Studio
         </h1>
-        <p className="text-sm text-slate-600 mt-1.5 max-w-3xl leading-relaxed">
-          Audit how pre-processing <strong>Reweighing</strong> fairness mitigation alters the estimated probability of default and SHAP feature attributions for an identical applicant profile.
+        <p className="text-xs sm:text-sm text-slate-600 mt-1.5 max-w-3xl leading-relaxed">
+          Audit how pre-processing <strong>Reweighing</strong> fairness mitigation alters the estimated risk score,
+          classification decision, and local SHAP feature attributions for an identical validated applicant profile.
         </p>
+
+        {/* Audit scope banner */}
+        <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs flex items-start space-x-2.5">
+          <ShieldCheck className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
+          <div className="space-y-0.5">
+            <span className="font-semibold text-slate-900">Protected Attribute Protocol:</span>{" "}
+            Sensitive demographic attributes (e.g. Sex / Derived Sex) are strictly excluded from predictive feature input matrix <code>X</code> in compliance with ECOA anti-discrimination auditing protocols. They are retained strictly for aggregate group fairness evaluation.
+          </div>
+        </div>
       </div>
 
       {errorMessage && (
@@ -139,7 +249,7 @@ export default function AssessPage() {
             <div>
               <p className="font-semibold">Assessment Request Failed</p>
               <p className="mt-0.5 leading-normal">{errorMessage}</p>
-              <p className="mt-1 text-[11px] text-rose-700 italic">No fallback or fabricated results are displayed.</p>
+              <p className="mt-1 text-[11px] text-rose-700 italic">No fabricated or estimated values are displayed.</p>
             </div>
           </div>
           <button
@@ -148,28 +258,32 @@ export default function AssessPage() {
             className="shrink-0 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs transition-colors flex items-center space-x-1"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Retry Assessment</span>
+            <span>Retry</span>
           </button>
         </div>
       )}
 
-      {/* Grid: Left Column = Form / Selectors, Right Column = Real Output */}
+      {/* Grid: Left Column = Form / Selectors, Right Column = Assessment & SHAP Outputs */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Form Column (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           <form onSubmit={handleRunAssessment} className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-5">
-            {/* Model & Dataset Selectors */}
+            {/* Step 1: Model & Dataset Selectors */}
             <div className="space-y-3 border-b border-slate-100 pb-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                1. Assessment Configuration
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-teal-700" />
+                  <span>1. Configuration &amp; Model</span>
+                </h3>
+                <span className="text-[10px] text-slate-400 font-mono">Step 1 of 2</span>
+              </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">Benchmark Dataset</label>
                 <select
                   value={selectedDataset}
                   onChange={(e) => handleDatasetChange(e.target.value as DatasetKey)}
-                  className="w-full text-xs font-medium rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                  className="w-full text-xs font-medium rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-700"
                 >
                   <option value="german">Statlog German Credit (N=1,000, 20 features)</option>
                   <option value="taiwan">Taiwan Credit Card Default (N=30,000, 23 features)</option>
@@ -181,10 +295,10 @@ export default function AssessPage() {
                 <select
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value as ModelKey)}
-                  className="w-full text-xs font-medium rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                  className="w-full text-xs font-medium rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-700"
                 >
-                  <option value="random_forest">Random Forest Classifier (Ensemble)</option>
-                  <option value="xgboost">XGBoost Classifier (Gradient Boosting)</option>
+                  <option value="random_forest">Random Forest Classifier (Bagged Trees)</option>
+                  <option value="xgboost">XGBoost Classifier (Gradient Boosted Trees)</option>
                   <option value="logistic_regression">Logistic Regression (Linear Baseline)</option>
                 </select>
               </div>
@@ -192,20 +306,20 @@ export default function AssessPage() {
               {/* Sample Profile Presets */}
               <div className="pt-2">
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1.5">
-                  <span className="font-medium">Quick Synthetic Presets:</span>
+                  <span className="font-medium">Demonstration Profiles:</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => handleLoadPreset("applicant_a_low_risk")}
-                    className="px-2.5 py-1.5 text-xs font-medium rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-center transition-colors"
+                    className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-center transition-colors"
                   >
                     Applicant A (Low Risk)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleLoadPreset("applicant_b_higher_risk")}
-                    className="px-2.5 py-1.5 text-xs font-medium rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-center transition-colors"
+                    className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-center transition-colors"
                   >
                     Applicant B (High Risk)
                   </button>
@@ -213,14 +327,14 @@ export default function AssessPage() {
               </div>
             </div>
 
-            {/* Applicant Features Form Fields */}
+            {/* Step 2: Applicant Features Form Fields */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   2. Financial Profile Features
                 </h3>
-                <span className="text-[10px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded font-medium border border-teal-200/60">
-                  Sex Excluded from X
+                <span className="text-[10px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded font-medium border border-teal-200">
+                  Validated Input Schema
                 </span>
               </div>
 
@@ -236,8 +350,13 @@ export default function AssessPage() {
                         max="72"
                         value={features["duration_months"] ?? 24}
                         onChange={(e) => handleFeatureChange("duration_months", parseFloat(e.target.value))}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                        className={`w-full text-xs rounded border px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700 ${
+                          validationErrors["duration_months"] ? "border-rose-400 bg-rose-50" : "border-slate-300"
+                        }`}
                       />
+                      {validationErrors["duration_months"] && (
+                        <p className="text-[10px] text-rose-600 mt-0.5">{validationErrors["duration_months"]}</p>
+                      )}
                     </div>
                     <div>
                       <label className="text-[11px] font-medium text-slate-600">Credit Amount (DM)</label>
@@ -247,8 +366,13 @@ export default function AssessPage() {
                         max="20000"
                         value={features["credit_amount"] ?? 2500}
                         onChange={(e) => handleFeatureChange("credit_amount", parseFloat(e.target.value))}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                        className={`w-full text-xs rounded border px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700 ${
+                          validationErrors["credit_amount"] ? "border-rose-400 bg-rose-50" : "border-slate-300"
+                        }`}
                       />
+                      {validationErrors["credit_amount"] && (
+                        <p className="text-[10px] text-rose-600 mt-0.5">{validationErrors["credit_amount"]}</p>
+                      )}
                     </div>
                   </div>
 
@@ -256,16 +380,33 @@ export default function AssessPage() {
                     <div>
                       <label className="text-[11px] font-medium text-slate-600">Checking Status</label>
                       <select
-                        value={features["checking_status"] ?? "A14"}
+                        value={features["checking_status"] ?? "A11"}
                         onChange={(e) => handleFeatureChange("checking_status", e.target.value)}
                         className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-700"
                       >
                         <option value="A11">&lt; 0 DM (A11)</option>
-                        <option value="A12">0 to 200 DM (A12)</option>
-                        <option value="A13">&gt;= 200 DM (A13)</option>
+                        <option value="A12">0 to &lt; 200 DM (A12)</option>
+                        <option value="A13">&gt;= 200 DM / Salary (A13)</option>
                         <option value="A14">No Checking Account (A14)</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-600">Savings Status</label>
+                      <select
+                        value={features["savings_status"] ?? "A21"}
+                        onChange={(e) => handleFeatureChange("savings_status", e.target.value)}
+                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-700"
+                      >
+                        <option value="A21">&lt; 100 DM (A21)</option>
+                        <option value="A22">100 to &lt; 500 DM (A22)</option>
+                        <option value="A23">500 to &lt; 1000 DM (A23)</option>
+                        <option value="A24">&gt;= 1000 DM (A24)</option>
+                        <option value="A25">Unknown / No Savings (A25)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="text-[11px] font-medium text-slate-600">Credit History</label>
                       <select
@@ -273,28 +414,11 @@ export default function AssessPage() {
                         onChange={(e) => handleFeatureChange("credit_history", e.target.value)}
                         className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-700"
                       >
-                        <option value="A30">No Credits Taken / Paid Duly (A30)</option>
-                        <option value="A31">Paid Duly at Bank (A31)</option>
-                        <option value="A32">Existing Paid Duly (A32)</option>
-                        <option value="A33">Delay in Paying Off (A33)</option>
+                        <option value="A30">No Credits Taken (A30)</option>
+                        <option value="A31">All Credits Paid Back Duly (A31)</option>
+                        <option value="A32">Existing Credits Paid Duly (A32)</option>
+                        <option value="A33">Delay in Paying in Past (A33)</option>
                         <option value="A34">Critical Account / Other Credits (A34)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="text-[11px] font-medium text-slate-600">Savings Status</label>
-                      <select
-                        value={features["savings_status"] ?? "A61"}
-                        onChange={(e) => handleFeatureChange("savings_status", e.target.value)}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-700"
-                      >
-                        <option value="A61">&lt; 100 DM (A61)</option>
-                        <option value="A62">100 to 500 DM (A62)</option>
-                        <option value="A63">500 to 1000 DM (A63)</option>
-                        <option value="A64">&gt;= 1000 DM (A64)</option>
-                        <option value="A65">Unknown / No Savings (A65)</option>
                       </select>
                     </div>
                     <div>
@@ -322,8 +446,13 @@ export default function AssessPage() {
                         max="75"
                         value={features["age"] ?? 35}
                         onChange={(e) => handleFeatureChange("age", parseFloat(e.target.value))}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                        className={`w-full text-xs rounded border px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700 ${
+                          validationErrors["age"] ? "border-rose-400 bg-rose-50" : "border-slate-300"
+                        }`}
                       />
+                      {validationErrors["age"] && (
+                        <p className="text-[10px] text-rose-600 mt-0.5">{validationErrors["age"]}</p>
+                      )}
                     </div>
                     <div>
                       <label className="text-[11px] font-medium text-slate-600">Installment Rate (% Inc)</label>
@@ -369,7 +498,9 @@ export default function AssessPage() {
                         step="10000"
                         value={features["limit_bal"] ?? 100000}
                         onChange={(e) => handleFeatureChange("limit_bal", parseFloat(e.target.value))}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700"
+                        className={`w-full text-xs rounded border px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700 ${
+                          validationErrors["limit_bal"] ? "border-rose-400 bg-rose-50" : "border-slate-300"
+                        }`}
                       />
                     </div>
                     <div>
@@ -415,7 +546,7 @@ export default function AssessPage() {
 
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-[10px] font-medium text-slate-600">Pay Status Sep (pay_0)</label>
+                      <label className="text-[10px] font-medium text-slate-600">Pay Sep (pay_0)</label>
                       <input
                         type="number"
                         min="-2"
@@ -426,7 +557,7 @@ export default function AssessPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-medium text-slate-600">Pay Status Aug (pay_2)</label>
+                      <label className="text-[10px] font-medium text-slate-600">Pay Aug (pay_2)</label>
                       <input
                         type="number"
                         min="-2"
@@ -437,7 +568,7 @@ export default function AssessPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-medium text-slate-600">Pay Status Jul (pay_3)</label>
+                      <label className="text-[10px] font-medium text-slate-600">Pay Jul (pay_3)</label>
                       <input
                         type="number"
                         min="-2"
@@ -448,49 +579,28 @@ export default function AssessPage() {
                       />
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="text-[11px] font-medium text-slate-600">Bill Amount Sep (NTD)</label>
-                      <input
-                        type="number"
-                        value={features["bill_amt1"] ?? 5000}
-                        onChange={(e) => handleFeatureChange("bill_amt1", parseFloat(e.target.value))}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-slate-600">Payment Amount Sep (NTD)</label>
-                      <input
-                        type="number"
-                        value={features["pay_amt1"] ?? 2000}
-                        onChange={(e) => handleFeatureChange("pay_amt1", parseFloat(e.target.value))}
-                        className="w-full text-xs rounded border border-slate-300 px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-700"
-                      />
-                    </div>
-                  </div>
                 </div>
               )}
-            </div>
 
-            {/* Run Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-lg bg-teal-800 hover:bg-teal-900 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Computing Real Inference &amp; SHAP Values…</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-teal-300" />
-                  <span>Run Credit-Risk Assessment</span>
-                </>
-              )}
-            </button>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading || Object.keys(validationErrors).length > 0}
+                className="w-full py-2.5 px-4 rounded-lg bg-teal-800 hover:bg-teal-900 disabled:bg-slate-300 text-white font-semibold text-xs transition-colors flex items-center justify-center space-x-2 shadow-xs"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Computing Predictions &amp; SHAP…</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-teal-300" />
+                    <span>Run Credit-Risk &amp; Explanation Audit</span>
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </div>
 
@@ -498,38 +608,44 @@ export default function AssessPage() {
         <div className="lg:col-span-7 space-y-6">
           {assessmentResult ? (
             <div className="space-y-6">
-              {/* Prediction Summary Header */}
+              {/* Step 3: Side-by-Side Risk Assessment Card */}
               <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                      Model Inference Result
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 capitalize">
-                      {formatDatasetLabel(assessmentResult.dataset)} — {formatModelLabel(assessmentResult.model)}
-                    </h3>
+                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                      <Scale className="w-4 h-4 text-teal-700" />
+                      <span>3. Baseline vs. Reweighed Risk Assessment</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Evaluated on identical profile inputs across pre-processing mitigation.
+                    </p>
                   </div>
-                  <span className="text-[11px] font-mono text-teal-800 bg-teal-50 px-2.5 py-1 rounded border border-teal-200">
-                    Live Evaluation
+                  <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2.5 py-1 rounded">
+                    {formatModelLabel(assessmentResult.model)}
                   </span>
                 </div>
 
-                {/* Baseline vs Reweighed Probability Comparison */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Side-by-Side Prediction Display */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Baseline Card */}
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs text-slate-500 font-medium border-b border-slate-200/60 pb-2">
+                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs text-slate-700 font-medium border-b border-slate-200/60 pb-2">
                       <div>
-                        <span className="font-bold text-slate-800 text-sm">Baseline Model</span>
-                        <p className="text-[10px] text-slate-500">Original trained model (no fairness mitigation)</p>
+                        <span className="font-bold text-slate-900 text-sm">Baseline Model</span>
+                        <p className="text-[10px] text-slate-500">Unmitigated empirical model</p>
                       </div>
-                      <span className="text-[10px] font-mono text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded">
-                        Threshold: {assessmentResult.baseline.prediction === 1 ? "Class 1 (Default)" : "Class 0 (Non-Default)"}
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
+                        assessmentResult.baseline.prediction === 1
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        {assessmentResult.baseline.prediction === 1 ? "Class 1: Default Risk" : "Class 0: Low Risk"}
                       </span>
                     </div>
+
                     <div>
                       <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider block">
-                        Estimated Probability of Default
+                        Estimated Default Probability
                       </span>
                       <div className="text-3xl font-extrabold tracking-tight text-slate-900 mt-0.5">
                         {formatPercent(assessmentResult.baseline.default_probability)}
@@ -538,22 +654,31 @@ export default function AssessPage() {
                         P(Default = 1 | X) = {assessmentResult.baseline.default_probability.toFixed(4)}
                       </p>
                     </div>
+
+                    <div className="pt-1 text-[10px] text-slate-500 border-t border-slate-200/50">
+                      Threshold: 0.50 · {assessmentResult.baseline.output_space}
+                    </div>
                   </div>
 
                   {/* Reweighed Card */}
                   <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs text-teal-800 font-medium border-b border-teal-200/60 pb-2">
+                    <div className="flex items-center justify-between text-xs text-teal-900 font-medium border-b border-teal-200/60 pb-2">
                       <div>
                         <span className="font-bold text-teal-950 text-sm">Reweighed Model</span>
-                        <p className="text-[10px] text-teal-700">Fairness-mitigated model (pre-processing sample weights)</p>
+                        <p className="text-[10px] text-teal-700">Pre-processing sample weight mitigation</p>
                       </div>
-                      <span className="text-[10px] font-mono text-teal-800 bg-teal-100/90 px-2 py-0.5 rounded">
-                        Threshold: {assessmentResult.reweighed.prediction === 1 ? "Class 1 (Default)" : "Class 0 (Non-Default)"}
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded ${
+                        assessmentResult.reweighed.prediction === 1
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        {assessmentResult.reweighed.prediction === 1 ? "Class 1: Default Risk" : "Class 0: Low Risk"}
                       </span>
                     </div>
+
                     <div>
                       <span className="text-[11px] font-semibold text-teal-800 uppercase tracking-wider block">
-                        Estimated Probability of Default
+                        Estimated Default Probability
                       </span>
                       <div className="text-3xl font-extrabold tracking-tight text-teal-950 mt-0.5">
                         {formatPercent(assessmentResult.reweighed.default_probability)}
@@ -561,6 +686,10 @@ export default function AssessPage() {
                       <p className="text-[10px] text-teal-700 font-mono mt-0.5">
                         P(Default = 1 | X, weights) = {assessmentResult.reweighed.default_probability.toFixed(4)}
                       </p>
+                    </div>
+
+                    <div className="pt-1 text-[10px] text-teal-700 border-t border-teal-200/50">
+                      Threshold: 0.50 · {assessmentResult.reweighed.output_space}
                     </div>
                   </div>
                 </div>
@@ -574,107 +703,170 @@ export default function AssessPage() {
                   const signStr = diffPctPoints > 0 ? `+${diffPctPoints.toFixed(2)}` : diffPctPoints.toFixed(2);
 
                   return (
-                    <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-2 text-xs">
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2 font-semibold text-slate-800">
+                        <div className="flex items-center space-x-2 font-semibold text-slate-900">
                           {diff < -0.0005 ? (
                             <TrendingDown className="w-4 h-4 text-emerald-600" />
                           ) : diff > 0.0005 ? (
                             <TrendingUp className="w-4 h-4 text-amber-600" />
                           ) : (
-                            <CheckCircle2 className="w-4 h-4 text-slate-600" />
+                            <Minus className="w-4 h-4 text-slate-500" />
                           )}
                           <span>
-                            Reweighing Probability Shift: {signStr} percentage points ({signStr}%)
+                            Reweighing Risk Shift: {signStr} percentage points ({signStr}%)
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[10px] text-slate-500 font-mono">
                           Reweighed − Baseline
                         </span>
                       </div>
 
                       <p className="text-slate-600 text-xs leading-relaxed">
-                        The difference represents how the estimated probability of default changes for this identical applicant profile when evaluated by the fairness-mitigated Reweighed model compared to the original baseline model.
-                      </p>
-
-                      <p className="text-[11px] text-slate-500 font-medium">
                         {assessmentResult.delta.interpretation}
                       </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-200/70 text-[11px]">
+                        <div>
+                          <strong className="text-slate-800">Score Representation:</strong> Model-estimated default probability under test distribution.
+                        </div>
+                        <div>
+                          <strong className="text-slate-800">Calibration Status:</strong> Uncalibrated raw probability score.
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
 
-                {/* Unobtrusive Model-Specific Information Note */}
-                <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 text-amber-900 text-xs flex items-start space-x-2.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-[11px] leading-relaxed">
-                    <strong>Auditing &amp; Research Note:</strong> Both values are model-specific estimated probabilities of default generated for research auditing. They do <em>not</em> constitute a credit underwriting decision, loan approval, rejection, credit score, or guarantee of a future financial outcome.
-                  </p>
+                {/* Scope & Interpretation Callout */}
+                <div className="p-3.5 rounded-lg bg-amber-50/70 border border-amber-200 text-amber-900 text-xs space-y-1">
+                  <div className="flex items-center space-x-1.5 font-bold">
+                    <AlertTriangle className="w-4 h-4 text-amber-700" />
+                    <span>Scientific &amp; Regulatory Meaning:</span>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5 text-[11px] leading-relaxed">
+                    <li><strong>Research Model Output:</strong> Both values are mathematical risk scores estimated for algorithmic fairness research. They do <em>not</em> constitute a credit bureau score or an adverse action notice.</li>
+                    <li><strong>No Calibrated Guarantee:</strong> Uncalibrated model scores should not be interpreted as certified empirical default frequencies.</li>
+                    <li><strong>No Causal Claim:</strong> Altering feature values reflects hypothetical model sensitivity, not real-world causal mechanisms in borrower financial behavior.</li>
+                  </ul>
                 </div>
               </div>
 
-              {/* Local SHAP Explanations Section */}
+              {/* Step 4: Local SHAP Explanation Studio */}
               <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
-                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Local SHAP Feature Attributions
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                      <Sparkles className="w-4 h-4 text-teal-700" />
+                      <span>4. Local SHAP Explanation Studio</span>
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Measuring the individual marginal contribution of this applicant's financial features toward default risk.
+                      Marginal feature attributions toward Default Risk (Y=1) for this specific applicant profile.
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono text-teal-800 bg-teal-50 px-2.5 py-1 rounded border border-teal-200 self-start sm:self-auto">
-                    {explanationResult ? explanationResult.output_space : "Awaiting Evaluation"}
-                  </span>
+
+                  {/* Toggle between Chart and Re-ranking Table */}
+                  <div className="flex items-center p-1 rounded-lg bg-slate-100 text-xs font-semibold self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setActiveExplanationView("chart")}
+                      className={`px-3 py-1 rounded-md transition-colors ${
+                        activeExplanationView === "chart"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Contribution Chart
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveExplanationView("reranking_table")}
+                      className={`px-3 py-1 rounded-md transition-colors ${
+                        activeExplanationView === "reranking_table"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Feature Re-ranking Table
+                    </button>
+                  </div>
                 </div>
 
                 {explanationResult ? (
                   <div className="space-y-4">
-                    <ShapBarChart
-                      data={explanationResult.top_contributors}
-                      title="Top 10 Feature Contributions to Default Prediction"
-                      outputSpace={explanationResult.output_space}
-                    />
-
-                    {/* Attribution Direction & Interpretation Guide */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5 font-semibold text-rose-700">
-                          <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
-                          <span>Positive Attribution (&gt; 0)</span>
+                    {/* View A: ShapBarChart */}
+                    {activeExplanationView === "chart" ? (
+                      <ShapBarChart
+                        data={explanationResult.top_contributors}
+                        title={`Top 10 Feature Contributions (${formatModelLabel(selectedModel)})`}
+                        outputSpace={explanationResult.output_space}
+                        explainerMethod={explanationResult.explainer_method}
+                      />
+                    ) : (
+                      /* View B: Feature Re-ranking Audit Table */
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-xs text-slate-500">
+                          <span>Comparison of Top 10 Drivers: Baseline vs. Reweighed</span>
+                          <span className="font-mono text-[11px]">Explainer: {explanationResult.explainer_method || "TreeExplainer"}</span>
                         </div>
-                        <p className="text-[11px] text-slate-600 leading-normal">
-                          Pushes model output toward <strong>higher estimated default risk</strong> for this applicant.
-                        </p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5 font-semibold text-emerald-700">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                          <span>Negative Attribution (&lt; 0)</span>
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                                <th className="p-2.5">Rank</th>
+                                <th className="p-2.5">Feature Name</th>
+                                <th className="p-2.5 text-right">Baseline SHAP</th>
+                                <th className="p-2.5 text-right">Reweighed SHAP</th>
+                                <th className="p-2.5 text-right">Net Shift (Δ)</th>
+                                <th className="p-2.5 text-center">Direction Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                              {featureRankingDiffs.map((row) => (
+                                <tr key={row.rank} className="hover:bg-slate-50/80">
+                                  <td className="p-2.5 text-slate-500 font-sans font-bold">#{row.rank}</td>
+                                  <td className="p-2.5 font-sans font-medium text-slate-900">
+                                    {row.featureName}
+                                    <span className="block text-[10px] text-slate-400 font-mono">{row.rawFeature}</span>
+                                  </td>
+                                  <td className={`p-2.5 text-right font-semibold ${row.baselineShap > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                    {row.baselineShap > 0 ? `+${row.baselineShap.toFixed(4)}` : row.baselineShap.toFixed(4)}
+                                  </td>
+                                  <td className={`p-2.5 text-right font-semibold ${row.reweighedShap > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                    {row.reweighedShap > 0 ? `+${row.reweighedShap.toFixed(4)}` : row.reweighedShap.toFixed(4)}
+                                  </td>
+                                  <td className="p-2.5 text-right font-bold text-slate-800">
+                                    {row.diffShap > 0 ? `+${row.diffShap.toFixed(4)}` : row.diffShap.toFixed(4)}
+                                  </td>
+                                  <td className="p-2.5 text-center">
+                                    {row.signFlipped ? (
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                                        Sign Inversion
+                                      </span>
+                                    ) : row.baselineShap > 0 ? (
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-50 text-rose-700">
+                                        Adverse
+                                      </span>
+                                    ) : (
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700">
+                                        Protective
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                        <p className="text-[11px] text-slate-600 leading-normal">
-                          Pushes model output toward <strong>lower estimated default risk</strong> (protective influence).
-                        </p>
                       </div>
+                    )}
 
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5 font-semibold text-slate-700">
-                          <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                          <span>Near-Zero Attribution (≈ 0)</span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 leading-normal">
-                          Negligible marginal contribution to this prediction under the selected architecture.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Output Space & Methodological Semantics Guide */}
-                    <div className="p-3.5 rounded-lg bg-blue-50/60 border border-blue-200/80 text-xs text-slate-700 space-y-1.5">
+                    {/* Output Space & Cross-Architecture Warning */}
+                    <div className="p-3.5 rounded-lg bg-blue-50/70 border border-blue-200 text-xs text-slate-700 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-blue-900">
-                          Output Space &amp; Interpretation Semantics
+                        <span className="font-semibold text-blue-900 flex items-center space-x-1.5">
+                          <Info className="w-4 h-4 text-blue-700" />
+                          <span>Output Space &amp; Cross-Architecture Semantics</span>
                         </span>
                         <span className="font-mono text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
                           {selectedModel === "random_forest"
@@ -686,18 +878,19 @@ export default function AssessPage() {
                       </div>
                       <p className="text-[11px] text-slate-600 leading-relaxed">
                         {selectedModel === "random_forest"
-                          ? "Random Forest SHAP values operate in probability space: feature attributions sum to the difference between the applicant's predicted default probability and the base rate."
+                          ? "Random Forest TreeExplainer computes attributions directly in probability space P(Y=1): the sum of attributions equals the difference between the applicant prediction and the empirical base rate."
                           : selectedModel === "logistic_regression"
-                          ? "Logistic Regression SHAP values operate in log-odds margin space: feature attributions sum to the linear logit shift relative to the background baseline."
-                          : "XGBoost SHAP values operate in margin space (log-odds before logistic sigmoid). Raw SHAP values must not be directly compared across different model architectures."}
+                          ? "Logistic Regression LinearExplainer computes attributions in log-odds margin space: values reflect linear logit contributions relative to the background distribution."
+                          : "XGBoost TreeExplainer computes attributions in margin log-odds space (raw tree ensemble sum before logistic sigmoid)."}
                       </p>
-                      <p className="text-[10px] text-slate-500 italic">
-                        * Causal Disclaimer: SHAP attributions reflect mathematical credit assignment within the fitted statistical model, not real-world causal mechanisms.
+                      <p className="text-[11px] text-amber-800 font-medium">
+                        * Architectural Warning: Raw SHAP values operate on fundamentally different mathematical scales across architectures. Never compare raw SHAP magnitudes between Random Forest and XGBoost directly without appropriate transformation.
                       </p>
                     </div>
 
+                    {/* Narrative Summary */}
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-                      <p className="font-semibold text-slate-800">Automated Summary</p>
+                      <p className="font-semibold text-slate-800">Explanation Summary</p>
                       <p className="text-[11px] leading-relaxed">
                         {explanationResult.summary}
                       </p>
@@ -708,22 +901,23 @@ export default function AssessPage() {
                   </div>
                 ) : (
                   <div className="h-48 flex items-center justify-center text-slate-400 text-xs italic bg-slate-50 rounded-lg border border-slate-200">
-                    Submit an applicant profile above to compute real-time SHAP feature attributions.
+                    Run assessment to compute real-time local SHAP feature attributions.
                   </div>
                 )}
               </div>
             </div>
           ) : (
+            /* Empty State */
             <div className="p-12 rounded-xl bg-white border border-slate-200 shadow-xs text-center space-y-4">
               <div className="w-12 h-12 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center mx-auto text-teal-700">
                 <Layers className="w-6 h-6" />
               </div>
               <div className="max-w-md mx-auto space-y-1.5">
                 <h3 className="text-base font-bold text-slate-800">
-                  Ready for Credit Risk Assessment
+                  Ready for Applicant Explanation Audit
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Select a dataset, model architecture, or demonstration preset profile, then click <strong>Run Credit-Risk Assessment</strong> to generate real-time Baseline vs. Reweighed default probabilities and local SHAP attributions.
+                  Select a dataset, model architecture, or demonstration preset profile, then click <strong>Run Credit-Risk &amp; Explanation Audit</strong> to compute live Baseline vs. Reweighed default predictions and individual SHAP feature attributions.
                 </p>
               </div>
             </div>

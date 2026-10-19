@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -19,9 +19,24 @@ interface ShapBarChartProps {
   data: FeatureAttribution[];
   title?: string;
   outputSpace?: string;
+  explainerMethod?: string;
 }
 
-export function ShapBarChart({ data, title, outputSpace }: ShapBarChartProps) {
+export function ShapBarChart({ data, title, outputSpace, explainerMethod }: ShapBarChartProps) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return (
+      <div className="h-96 w-full flex items-center justify-center bg-slate-50 text-xs text-slate-400 rounded-lg border border-slate-200">
+        Initializing explanation chart…
+      </div>
+    );
+  }
+
   if (!data || data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-slate-400 text-xs italic bg-slate-50 rounded-lg border border-slate-200">
@@ -49,8 +64,15 @@ export function ShapBarChart({ data, title, outputSpace }: ShapBarChartProps) {
   return (
     <div className="space-y-3">
       {title && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-          <h4 className="text-xs font-semibold text-slate-800">{title}</h4>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-slate-100 pb-2">
+          <div className="flex items-center space-x-2">
+            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">{title}</h4>
+            {explainerMethod && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
+                {explainerMethod}
+              </span>
+            )}
+          </div>
           {outputSpace && (
             <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded self-start sm:self-auto">
               Space: {outputSpace}
@@ -123,11 +145,11 @@ export function ShapBarChart({ data, title, outputSpace }: ShapBarChartProps) {
 
                       <div className="text-[10px] text-slate-400 border-t border-slate-800 pt-1.5 leading-tight">
                         {bVal > 0.001 ? (
-                          <span className="text-amber-300">Positive: Pushes prediction toward higher default risk.</span>
+                          <span className="text-amber-300">Positive (&gt;0): Pushes prediction toward higher default risk.</span>
                         ) : bVal < -0.001 ? (
-                          <span className="text-emerald-300">Negative: Pushes prediction toward lower default risk.</span>
+                          <span className="text-emerald-300">Negative (&lt;0): Pushes prediction toward lower default risk.</span>
                         ) : (
-                          <span>Near-zero: Negligible marginal impact.</span>
+                          <span>Near-zero (≈0): Negligible marginal impact.</span>
                         )}
                       </div>
                     </div>
