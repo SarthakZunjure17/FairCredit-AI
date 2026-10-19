@@ -30,6 +30,8 @@ import {
   ModelKey
 } from "@/types";
 import { ShapBarChart } from "@/components/ShapBarChart";
+import { ReportModal } from "@/components/ReportModal";
+import { FileText } from "lucide-react";
 import {
   DATASET_LABELS,
   MODEL_LABELS,
@@ -47,6 +49,7 @@ export default function AssessPage() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState<AssessmentResponse | null>(null);
   const [explanationResult, setExplanationResult] = useState<ExplanationResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -620,9 +623,19 @@ export default function AssessPage() {
                       Evaluated on identical profile inputs across pre-processing mitigation.
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2.5 py-1 rounded">
-                    {formatModelLabel(assessmentResult.model)}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2.5 py-1 rounded hidden sm:inline">
+                      {formatModelLabel(assessmentResult.model)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsReportModalOpen(true)}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1 rounded text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white shadow-2xs transition-colors"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Export PDF Audit</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Side-by-Side Prediction Display */}
@@ -924,6 +937,45 @@ export default function AssessPage() {
           )}
         </div>
       </div>
+      {assessmentResult && (
+        <ReportModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          reportType="applicant"
+          title="Applicant Risk Assessment & Explainability Audit"
+          subtitle={`Individual evaluation on ${DATASET_LABELS[selectedDataset]} using ${MODEL_LABELS[selectedModel]}`}
+          configuration={{
+            "Dataset": DATASET_LABELS[selectedDataset],
+            "Model Architecture": MODEL_LABELS[selectedModel],
+            "Baseline Score": `${assessmentResult.baseline.prediction_label} (P=${assessmentResult.baseline.default_probability.toFixed(4)})`,
+            "Reweighed Score": `${assessmentResult.reweighed.prediction_label} (P=${assessmentResult.reweighed.default_probability.toFixed(4)})`,
+            "Score Difference": `${assessmentResult.delta.probability_difference > 0 ? "+" : ""}${assessmentResult.delta.probability_difference.toFixed(4)} (${assessmentResult.delta.percent_difference > 0 ? "+" : ""}${assessmentResult.delta.percent_difference.toFixed(1)}%)`,
+            "Output Space": explanationResult?.output_space || "Probability Space P(Y=1)"
+          }}
+          sections={[
+            "Individual Risk Prediction & Score Interpretation",
+            "Uncalibrated Probability & Decision Threshold Notice",
+            "Local SHAP Feature Attribution Table (Top Contributors)",
+            "Local Feature Attribution Waterfall Figure",
+            "Attribution Stability & Comparative Analysis",
+            "ECOA/FCRA Non-Adverse Action Governance Disclaimers"
+          ]}
+          pageEstimate="Estimated 3 Pages (Letter PDF)"
+          disclaimer="Privacy Safeguard: Demographic attributes (gender, age) are strictly excluded from applicant inputs. Applicant profile attributes are processed ephemerally in volatile memory without database persistence."
+          onDownload={async () => {
+            await api.downloadApplicantReport({
+              dataset: assessmentResult.dataset,
+              model: assessmentResult.model,
+              baseline: assessmentResult.baseline,
+              reweighed: assessmentResult.reweighed,
+              delta: assessmentResult.delta,
+              top_contributors: explanationResult?.top_contributors || [],
+              output_space: explanationResult?.output_space || "Probability Space P(Y=1)",
+              explainer_method: explanationResult?.explainer_method || "TreeExplainer"
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

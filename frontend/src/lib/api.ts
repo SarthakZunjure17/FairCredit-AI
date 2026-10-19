@@ -72,6 +72,61 @@ export const api = {
     return fetchJson<FairnessAuditResponse>(`/fairness/audit${q}`);
   },
 
+  downloadResearchReport: async (dataset = "german", model = "random_forest", mitigation = "reweighing", protectedAttribute = "sex") => {
+    const params = new URLSearchParams({
+      dataset,
+      model,
+      mitigation,
+      protected_attribute: protectedAttribute
+    });
+    const res = await fetch(`${API_BASE}/reports/research?${params.toString()}`);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to generate research report (${res.status}): ${err}`);
+    }
+    const blob = await res.blob();
+    const filename = `faircredit_research_report_${dataset}_${model}_${mitigation}_${protectedAttribute}.pdf`;
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  downloadApplicantReport: async (payload: {
+    dataset: string;
+    model: string;
+    baseline: any;
+    reweighed: any;
+    delta: any;
+    top_contributors: any[];
+    output_space: string;
+    explainer_method?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/reports/applicant`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to generate applicant report (${res.status}): ${err}`);
+    }
+    const blob = await res.blob();
+    const filename = `faircredit_applicant_report_${payload.dataset}_${payload.model}.pdf`;
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
   getIndividualShap: (dataset: string, model: string, applicant_idx = 0) =>
     fetchJson<IndividualShapResponse>(`/research/individual-shap?dataset=${dataset}&model=${model}&applicant_idx=${applicant_idx}`)
 };

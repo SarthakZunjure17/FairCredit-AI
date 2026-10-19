@@ -1,5 +1,5 @@
 ﻿from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from backend.app.schemas.assessment import (
     PredictionRequest,
     AssessmentResponse,
@@ -18,6 +18,8 @@ from backend.app.schemas.research import (
 )
 from backend.app.services.model_service import model_service
 from backend.app.services.research_service import research_service
+from backend.app.services.report_service import report_service
+from backend.app.schemas.report import ResearchReportRequest, ApplicantReportRequest
 
 router = APIRouter()
 
@@ -179,4 +181,60 @@ def get_fairness_audit(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate fairness audit: {str(e)}")
+
+@router.post("/reports/research")
+def generate_research_report_post(req: ResearchReportRequest):
+    try:
+        pdf_bytes = report_service.generate_research_report(req)
+        filename = f"faircredit_research_report_{req.dataset}_{req.model}_{req.mitigation}_{req.protected_attribute}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate research report: {str(e)}")
+
+@router.get("/reports/research")
+def generate_research_report_get(
+    dataset: str = Query("german", description="Dataset identifier: 'taiwan' or 'german'"),
+    model: str = Query("random_forest", description="Model architecture: 'logistic_regression', 'random_forest', or 'xgboost'"),
+    mitigation: str = Query("reweighing", description="Mitigation method: 'reweighing', 'exponentiated_gradient', or 'threshold_optimizer'"),
+    protected_attribute: str = Query("sex", description="Protected attribute: 'sex' or 'age'")
+):
+    try:
+        req = ResearchReportRequest(
+            dataset=dataset,
+            model=model,
+            mitigation=mitigation,
+            protected_attribute=protected_attribute
+        )
+        pdf_bytes = report_service.generate_research_report(req)
+        filename = f"faircredit_research_report_{dataset}_{model}_{mitigation}_{protected_attribute}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate research report: {str(e)}")
+
+@router.post("/reports/applicant")
+def generate_applicant_report(req: ApplicantReportRequest):
+    try:
+        pdf_bytes = report_service.generate_applicant_report(req)
+        filename = f"faircredit_applicant_report_{req.dataset}_{req.model}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate applicant report: {str(e)}")
 

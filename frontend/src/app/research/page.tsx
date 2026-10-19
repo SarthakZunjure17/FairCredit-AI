@@ -20,7 +20,8 @@ import {
   Layers,
   FileSpreadsheet,
   Activity,
-  SlidersHorizontal
+  SlidersHorizontal,
+  FileText
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -42,13 +43,16 @@ import {
   ModelKey
 } from "@/types";
 import { MetricCard } from "@/components/MetricCard";
+import { ReportModal } from "@/components/ReportModal";
 import {
   formatMetric,
   formatPercent,
   formatDelta,
   formatDatasetLabel,
   formatModelLabel,
-  formatMitigationLabel
+  formatMitigationLabel,
+  DATASET_LABELS,
+  MODEL_LABELS
 } from "@/lib/utils";
 
 // Custom Collapsible Accordion Section
@@ -92,6 +96,7 @@ function ExpandableSection({
           {children}
         </div>
       )}
+
     </div>
   );
 }
@@ -121,6 +126,7 @@ function CustomChartTooltip({ active, payload, label }: any) {
 
 export default function ResearchPage() {
   const [isMounted, setIsMounted] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -1048,14 +1054,25 @@ export default function ResearchPage() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={exportTableToCsv}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export Filtered CSV</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={exportTableToCsv}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 shadow-2xs transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Filtered CSV</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white shadow-2xs transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Export Audit Report (PDF)</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1538,6 +1555,7 @@ export default function ResearchPage() {
           </div>
         </ExpandableSection>
       </div>
+
     </div>
   );
 }

@@ -421,3 +421,110 @@ def test_fairness_audit_threshold_optimizer_auc_handling():
     assert auc_item["direction"] == "not_applicable"
     assert "N/A: ThresholdOptimizer produces discrete binary decisions" in auc_item["interpretation"]
 
+
+# ==============================================================================
+# STAGE 4 TESTS: EVIDENCE-BASED AUDIT REPORT GENERATOR (PDF & PRIVACY INTEGRITY)
+# ==============================================================================
+
+def test_research_report_generation_post_and_get():
+    """Verify research PDF report generation via both POST and GET with valid %PDF- magic bytes."""
+    # Test POST
+    payload = {
+        "dataset": "german",
+        "model": "random_forest",
+        "mitigation": "reweighing",
+        "protected_attribute": "sex"
+    }
+    res_post = client.post("/api/reports/research", json=payload)
+    assert res_post.status_code == 200, f"POST /api/reports/research failed: {res_post.text}"
+    assert res_post.headers["content-type"] == "application/pdf"
+    assert "attachment; filename=" in res_post.headers["content-disposition"]
+    assert res_post.content.startswith(b"%PDF-"), "Generated file does not have valid PDF magic bytes"
+    assert len(res_post.content) > 5000, "PDF content is too small"
+
+    # Test GET
+    res_get = client.get("/api/reports/research?dataset=taiwan&model=xgboost&mitigation=threshold_optimizer&protected_attribute=age")
+    assert res_get.status_code == 200, f"GET /api/reports/research failed: {res_get.text}"
+    assert res_get.headers["content-type"] == "application/pdf"
+    assert res_get.content.startswith(b"%PDF-")
+    assert len(res_get.content) > 5000
+
+
+def test_applicant_report_generation_post():
+    """Verify applicant assessment PDF report generation with valid %PDF- magic bytes."""
+    payload = {
+        "dataset": "german",
+        "model": "random_forest",
+        "baseline": {
+            "prediction": 0,
+            "prediction_label": "Good Credit (Approved)",
+            "default_probability": 0.2131,
+            "score_meaning": "Empirical risk score. Uncalibrated."
+        },
+        "reweighed": {
+            "prediction": 0,
+            "prediction_label": "Good Credit (Approved)",
+            "default_probability": 0.1850,
+            "score_meaning": "Empirical risk score. Uncalibrated."
+        },
+        "delta": {
+            "probability_difference": -0.0281,
+            "percent_difference": -13.19,
+            "interpretation": "Reweighing reduced default probability from 0.2131 to 0.1850 (-0.0281)"
+        },
+        "top_contributors": [
+            {"feature": "checking_status", "feature_raw": "checking_status", "baseline_shap": 0.082, "reweighed_shap": 0.065, "diff_shap": -0.017},
+            {"feature": "duration_months", "feature_raw": "duration_months", "baseline_shap": -0.045, "reweighed_shap": -0.040, "diff_shap": 0.005},
+            {"feature": "credit_history", "feature_raw": "credit_history", "baseline_shap": -0.038, "reweighed_shap": -0.035, "diff_shap": 0.003}
+        ],
+        "output_space": "Probability Space P(Y=1)",
+        "explainer_method": "TreeExplainer (Exact Tree Path Attribution)"
+    }
+    res = client.post("/api/reports/applicant", json=payload)
+    assert res.status_code == 200, f"POST /api/reports/applicant failed: {res.text}"
+    assert res.headers["content-type"] == "application/pdf"
+    assert "attachment; filename=" in res.headers["content-disposition"]
+    assert res.content.startswith(b"%PDF-")
+    assert len(res.content) > 3000
+
+
+def test_research_report_unsupported_configurations():
+    """Verify that unsupported parameters return 400 Bad Request with descriptive error."""
+    # Unsupported dataset
+    res1 = client.post("/api/reports/research", json={"dataset": "unknown", "model": "random_forest"})
+    assert res1.status_code == 400
+    assert "Unsupported dataset" in res1.json()["detail"]
+
+    # Unsupported model
+    res2 = client.post("/api/reports/research", json={"dataset": "german", "model": "svm"})
+    assert res2.status_code == 400
+    assert "Unsupported model" in res2.json()["detail"]
+
+    # Unsupported mitigation
+    res3 = client.post("/api/reports/research", json={"dataset": "german", "model": "random_forest", "mitigation": "calmon"})
+    assert res3.status_code == 400
+    assert "Unsupported mitigation" in res3.json()["detail"]
+
+
+def test_applicant_report_data_privacy_no_disk_persistence():
+    """Verify that generating an applicant report does not persist applicant data to disk or write temp files."""
+    import glob, tempfile
+    temp_dir = tempfile.gettempdir()
+    before_files = set(glob.glob(os.path.join(temp_dir, "*faircredit*")))
+
+    payload = {
+        "dataset": "taiwan",
+        "model": "xgboost",
+        "baseline": {"prediction": 1, "prediction_label": "High Risk (Denied)", "default_probability": 0.72},
+        "reweighed": {"prediction": 1, "prediction_label": "High Risk (Denied)", "default_probability": 0.68},
+        "delta": {"probability_difference": -0.04, "percent_difference": -5.55, "interpretation": "Decreased risk"},
+        "top_contributors": [{"feature": "pay_0", "baseline_shap": 0.25, "reweighed_shap": 0.21, "diff_shap": -0.04}],
+        "output_space": "Margin Space (Tree Ensembles)"
+    }
+    res = client.post("/api/reports/applicant", json=payload)
+    assert res.status_code == 200
+
+    after_files = set(glob.glob(os.path.join(temp_dir, "*faircredit*")))
+    # Assert no leaked persistent files
+    assert after_files == before_files, "Temporary report files were unexpectedly persisted to disk"
+

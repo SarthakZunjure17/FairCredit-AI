@@ -16,7 +16,8 @@ import {
   ArrowRight,
   Database,
   HelpCircle,
-  Activity
+  Activity,
+  FileText
 } from "lucide-react";
 import {
   BarChart,
@@ -40,6 +41,7 @@ import {
   IndividualShapResponse
 } from "@/types";
 import { MetricCard } from "@/components/MetricCard";
+import { ReportModal } from "@/components/ReportModal";
 import { ShapBarChart } from "@/components/ShapBarChart";
 import {
   DATASET_LABELS,
@@ -67,6 +69,7 @@ export default function FairnessPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -223,9 +226,19 @@ export default function FairnessPage() {
             <Layers className="w-4 h-4 text-teal-700" />
             <span>Interactive Audit Configuration</span>
           </div>
-          <span className="text-[11px] text-slate-500 font-mono">
-            {DATASET_LABELS[selectedDataset]} · {MODEL_LABELS[selectedModel]}
-          </span>
+          <div className="flex items-center space-x-3">
+            <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
+              {DATASET_LABELS[selectedDataset]} · {MODEL_LABELS[selectedModel]}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsReportModalOpen(true)}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white shadow-2xs transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Export Audit Report (PDF)</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -923,6 +936,35 @@ export default function FairnessPage() {
           </div>
         </div>
       </div>
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportType="research"
+        title="Subgroup Fairness Audit Report"
+        subtitle={`Empirical evaluation for ${DATASET_LABELS[selectedDataset]} using ${MODEL_LABELS[selectedModel]} (${formatMitigationLabel(selectedMitigation)})`}
+        configuration={{
+          "Dataset": DATASET_LABELS[selectedDataset],
+          "Model Architecture": MODEL_LABELS[selectedModel],
+          "Mitigation Method": formatMitigationLabel(selectedMitigation),
+          "Protected Attribute": selectedProtectedAttr === "sex" ? "Gender / Sex (Primary)" : "Age Cohort (<=25 vs >25)",
+          "Data Source": "results/mitigated_subgroup_metrics.csv",
+          "Evaluation Partition": selectedDataset === "german" ? "Held-Out Test Set (N=200)" : "Held-Out Test Set (N=6,000)"
+        }}
+        sections={[
+          "Executive Summary & Auditing Scope",
+          "Predictive Utility Benchmark Table (Accuracy, ROC-AUC, F1)",
+          "Demographic Subgroup Confusion Matrix (N, TP, TN, FP, FN)",
+          "Subgroup Distribution & Error Rate Visualizations",
+          "Explanation Stability Audit (SHAP Consistency Freeze)",
+          "Evidence-Based Findings & Mathematical Trade-Offs",
+          "EEOC 80% Rule & Non-Commercial Disclaimers"
+        ]}
+        pageEstimate="Estimated 4 Pages (Letter PDF)"
+        disclaimer="Protected demographic attributes (gender, age) are strictly isolated from model training features X under research protocol. Metrics represent verified empirical benchmark evaluations."
+        onDownload={async () => {
+          await api.downloadResearchReport(selectedDataset, selectedModel, selectedMitigation, selectedProtectedAttr);
+        }}
+      />
     </div>
   );
 }
