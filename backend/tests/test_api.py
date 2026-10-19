@@ -296,3 +296,128 @@ def test_explain_logistic_regression_linear_explainer():
     assert exp_data["explainer_method"] == "LinearExplainer"
     assert "Margin" in exp_data["output_space"] or "Log-Odds" in exp_data["output_space"]
     assert len(exp_data["top_contributors"]) > 0
+
+
+# ==============================================================================
+# STAGE 3 TESTS: FAIRNESS WORKBENCH AUDIT ENDPOINTS & MATHEMATICAL SAFEGUARDS
+# ==============================================================================
+
+def test_fairness_audit_valid_configurations():
+    """Verify that supported configurations return 200 with complete subgroup fairness audits."""
+    configs = [
+        ("german", "random_forest", "reweighing", "sex", 200),
+        ("taiwan", "xgboost", "threshold_optimizer", "age", 6000),
+        ("taiwan", "logistic_regression", "exponentiated_gradient", "sex", 6000),
+        ("german", "logistic_regression", "reweighing", "age", 200)
+    ]
+    for ds, m, mit, pa, expected_n in configs:
+        res = client.get(f"/api/fairness/audit?dataset={ds}&model={m}&mitigation={mit}&protected_attribute={pa}")
+        assert res.status_code == 200, f"Failed for {ds}-{m}-{mit}-{pa}: {res.text}"
+        data = res.json()
+        assert data["dataset"] == ds
+        assert data["model"] == m
+        assert data["mitigation_method"] == mit
+        assert data["protected_attribute"] == pa
+
+        assert len(data["baseline_subgroups"]) == 2
+        assert len(data["mitigated_subgroups"]) == 2
+        total_n = sum(g["sample_count"] for g in data["baseline_subgroups"])
+        assert total_n == expected_n
+
+        assert "equalized_odds_difference" in data["baseline_fairness"]
+        assert "demographic_parity_difference" in data["baseline_fairness"]
+        assert "approval_disparate_impact" in data["baseline_fairness"]
+        assert len(data["metric_comparisons"]) >= 3
+        assert len(data["audit_findings"]) >= 2
+
+
+def test_fairness_audit_metric_definitions_and_group_ordering():
+    """Verify group ordering (u/p) and exact mathematical formulas for EOD, DPD, Approval DI."""
+    res = client.get("/api/fairness/audit?dataset=german&model=random_forest&mitigation=reweighing&protected_attribute=sex")
+    assert res.status_code == 200
+    data = res.json()
+
+    # Check baseline subgroups
+    u = next(g for g in data["baseline_subgroups"] if g["group_role"] == "unprivileged")
+    p = next(g for g in data["baseline_subgroups"] if g["group_role"] == "privileged")
+
+    assert u["group"] == "female"
+    assert p["group"] == "male"
+    assert u["sample_count"] == 61
+    assert p["sample_count"] == 139
+
+    # Recompute EOD
+    eopp = abs(u["true_positive_rate"] - p["true_positive_rate"])
+    fpr_diff = abs(u["false_positive_rate"] - p["false_positive_rate"])
+    expected_eod = round(max(eopp, fpr_diff), 4)
+    assert abs(data["baseline_fairness"]["equalized_odds_difference"] - expected_eod) < 1e-4
+
+    # Recompute DPD
+    expected_dpd = round(abs(u["selection_rate"] - p["selection_rate"]), 4)
+    assert abs(data["baseline_fairness"]["demographic_parity_difference"] - expected_dpd) < 1e-4
+
+    # Recompute Approval DI
+    expected_di = round(u["approval_rate"] / p["approval_rate"], 4)
+    assert abs(data["baseline_fairness"]["approval_disparate_impact"] - expected_di) < 1e-4
+
+
+def test_fairness_audit_unsupported_configurations():
+    """Verify that unsupported parameters return 400 Bad Request with explanatory message."""
+    # Unsupported dataset
+    res = client.get("/api/fairness/audit?dataset=adult&model=random_forest")
+    assert res.status_code == 400
+    assert "Unsupported dataset" in res.json()["detail"]
+
+    # Unsupported model
+    res = client.get("/api/fairness/audit?dataset=german&model=svm")
+    assert res.status_code == 400
+    assert "Unsupported model" in res.json()["detail"]
+
+    # Unsupported mitigation
+    res = client.get("/api/fairness/audit?dataset=german&model=random_forest&mitigation=calmon")
+    assert res.status_code == 400
+    assert "Unsupported mitigation" in res.json()["detail"]
+
+    # Unsupported protected attribute
+    res = client.get("/api/fairness/audit?dataset=german&model=random_forest&protected_attribute=race")
+    assert res.status_code == 400
+    assert "Unsupported protected attribute" in res.json()["detail"]
+
+
+def test_fairness_audit_zero_denominator_safeguards():
+    """Verify safe division safeguard when denominator is zero."""
+    from backend.app.services.research_service import research_service
+
+    # Test _safe_divide directly
+    res_zero = research_service._safe_divide(10.0, 0.0, fallback=1.0)
+    assert res_zero == 1.0
+
+    # Test disparity calculation with zero approval rate in privileged group
+    u_mock = {
+        "group": "female", "group_role": "unprivileged", "sample_count": 50,
+        "observed_default_rate": 0.2, "selection_rate": 0.2, "approval_rate": 0.8,
+        "true_positive_rate": 0.5, "false_positive_rate": 0.1,
+        "tp": 10, "tn": 40, "fp": 0, "fn": 0
+    }
+    p_mock = {
+        "group": "male", "group_role": "privileged", "sample_count": 50,
+        "observed_default_rate": 0.2, "selection_rate": 1.0, "approval_rate": 0.0,
+        "true_positive_rate": 0.5, "false_positive_rate": 0.1,
+        "tp": 10, "tn": 0, "fp": 40, "fn": 0
+    }
+    disparities = research_service._compute_fairness_disparities(u_mock, p_mock)
+    assert disparities["approval_disparate_impact"] == 1.0  # safe fallback
+
+
+def test_fairness_audit_threshold_optimizer_auc_handling():
+    """Verify that ThresholdOptimizer handles non-continuous AUC cleanly with direction='not_applicable'."""
+    res = client.get("/api/fairness/audit?dataset=taiwan&model=xgboost&mitigation=threshold_optimizer&protected_attribute=sex")
+    assert res.status_code == 200
+    data = res.json()
+
+    auc_item = next((c for c in data["metric_comparisons"] if c["metric_key"] == "roc_auc"), None)
+    assert auc_item is not None
+    assert auc_item["mitigated_value"] is None
+    assert auc_item["direction"] == "not_applicable"
+    assert "N/A: ThresholdOptimizer produces discrete binary decisions" in auc_item["interpretation"]
+

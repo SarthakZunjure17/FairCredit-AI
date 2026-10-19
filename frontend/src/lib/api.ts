@@ -6,7 +6,8 @@
   ShapSummaryRow,
   CaseStudyData,
   IndividualShapResponse,
-  FinalResearchResultRow
+  FinalResearchResultRow,
+  FairnessAuditResponse
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
@@ -61,6 +62,16 @@ export const api = {
   
   getCaseStudy: () => fetchJson<CaseStudyData>("/research/case-study"),
   
+  getFairnessAudit: (dataset?: string, model?: string, mitigation?: string, protectedAttribute?: string) => {
+    const params = new URLSearchParams();
+    if (dataset) params.append("dataset", dataset);
+    if (model) params.append("model", model);
+    if (mitigation) params.append("mitigation", mitigation);
+    if (protectedAttribute) params.append("protected_attribute", protectedAttribute);
+    const q = params.toString() ? `?${params.toString()}` : "";
+    return fetchJson<FairnessAuditResponse>(`/fairness/audit${q}`);
+  },
+
   getIndividualShap: (dataset: string, model: string, applicant_idx = 0) =>
     fetchJson<IndividualShapResponse>(`/research/individual-shap?dataset=${dataset}&model=${model}&applicant_idx=${applicant_idx}`)
 };

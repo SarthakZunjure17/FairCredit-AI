@@ -180,3 +180,77 @@ export interface FinalResearchResultRow {
   Performance_Direction?: string;
   Explanation_Consistency_Level?: string;
 }
+
+export type ProtectedAttributeKey = "sex" | "age";
+
+export interface SubgroupMetricItem {
+  group: string;
+  group_role: "unprivileged" | "privileged" | string;
+  sample_count: number;
+  observed_default_rate: number;
+  selection_rate: number;
+  approval_rate: number;
+  true_positive_rate: number;
+  false_positive_rate: number;
+  tp: number;
+  tn: number;
+  fp: number;
+  fn: number;
+}
+
+export interface FairnessDisparityMetrics {
+  equalized_odds_difference: number;
+  equal_opportunity_difference: number;
+  demographic_parity_difference: number;
+  approval_disparate_impact: number;
+  approval_di_distance: number;
+  unprivileged_group: string;
+  privileged_group: string;
+}
+
+export interface MetricComparisonItem {
+  metric_name: string;
+  metric_key: string;
+  baseline_value?: number | null;
+  mitigated_value?: number | null;
+  absolute_change?: number | null;
+  direction: "improved" | "degraded" | "unchanged" | "not_applicable" | string;
+  interpretation: string;
+  parity_benchmark: string;
+  four_fifths_status?: string | null;
+}
+
+export interface FairnessAuditResponse {
+  dataset: string;
+  model: string;
+  mitigation_method: string;
+  protected_attribute: string;
+  evaluation_context: {
+    dataset_name: string;
+    dataset_display: string;
+    model_architecture: string;
+    mitigation_method: string;
+    protected_attribute: string;
+    protected_attribute_label: string;
+    unprivileged_group_definition: string;
+    privileged_group_definition: string;
+    data_source: string;
+    total_test_samples: number;
+    disclaimer: string;
+  };
+  conventions: {
+    target_positive_class: string;
+    prediction_positive_class: string;
+    approval_event: string;
+    approval_disparate_impact_ordering: string;
+    demographic_parity_formula: string;
+    equalized_odds_formula: string;
+  };
+  baseline_subgroups: SubgroupMetricItem[];
+  mitigated_subgroups: SubgroupMetricItem[];
+  baseline_fairness: FairnessDisparityMetrics;
+  mitigated_fairness: FairnessDisparityMetrics;
+  metric_comparisons: MetricComparisonItem[];
+  audit_findings: string[];
+}
+

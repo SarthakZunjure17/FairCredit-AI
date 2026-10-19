@@ -94,3 +94,52 @@ class FinalResearchResultRow(BaseModel):
     Fairness_Direction: Optional[str] = None
     Performance_Direction: Optional[str] = None
     Explanation_Consistency_Level: Optional[str] = None
+
+class SubgroupMetricItem(BaseModel):
+    group: str
+    group_role: str
+    sample_count: int
+    observed_default_rate: float
+    selection_rate: float
+    approval_rate: float
+    true_positive_rate: float
+    false_positive_rate: float
+    tp: int
+    tn: int
+    fp: int
+    fn: int
+
+class FairnessDisparityMetrics(BaseModel):
+    equalized_odds_difference: float
+    equal_opportunity_difference: float
+    demographic_parity_difference: float
+    approval_disparate_impact: float
+    approval_di_distance: float
+    unprivileged_group: str
+    privileged_group: str
+
+class MetricComparisonItem(BaseModel):
+    metric_name: str
+    metric_key: str
+    baseline_value: Optional[float] = None
+    mitigated_value: Optional[float] = None
+    absolute_change: Optional[float] = None
+    direction: str
+    interpretation: str
+    parity_benchmark: str
+    four_fifths_status: Optional[str] = None
+
+class FairnessAuditResponse(BaseModel):
+    dataset: str
+    model: str
+    mitigation_method: str
+    protected_attribute: str
+    evaluation_context: Dict[str, Any]
+    conventions: Dict[str, str]
+    baseline_subgroups: List[SubgroupMetricItem]
+    mitigated_subgroups: List[SubgroupMetricItem]
+    baseline_fairness: FairnessDisparityMetrics
+    mitigated_fairness: FairnessDisparityMetrics
+    metric_comparisons: List[MetricComparisonItem]
+    audit_findings: List[str]
+

@@ -13,7 +13,8 @@ from backend.app.schemas.research import (
     ResearchMatrixRow,
     ShapSummaryRow,
     IndividualShapQueryResponse,
-    FinalResearchResultRow
+    FinalResearchResultRow,
+    FairnessAuditResponse
 )
 from backend.app.services.model_service import model_service
 from backend.app.services.research_service import research_service
@@ -159,3 +160,23 @@ def get_individual_shap(
         )
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/fairness/audit", response_model=FairnessAuditResponse)
+def get_fairness_audit(
+    dataset: str = Query("german", description="Dataset identifier (taiwan or german)"),
+    model: str = Query("random_forest", description="Model architecture (logistic_regression, random_forest, or xgboost)"),
+    mitigation: str = Query("reweighing", description="Mitigation method (reweighing, exponentiated_gradient, or threshold_optimizer)"),
+    protected_attribute: str = Query("sex", description="Protected attribute for group audit (sex or age)")
+):
+    try:
+        return research_service.get_fairness_audit(
+            dataset=dataset,
+            model=model,
+            mitigation=mitigation,
+            protected_attribute=protected_attribute
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate fairness audit: {str(e)}")
+
