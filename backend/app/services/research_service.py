@@ -39,6 +39,9 @@ class ResearchDataService:
         if "final_research" not in self._cache:
             path = os.path.join(self.results_dir, "final_research_results.csv")
             df = pd.read_csv(path)
+            df["Dataset"] = df["Dataset"].astype(str).str.lower().str.strip()
+            df["Model"] = df["Model"].astype(str).str.lower().str.strip()
+            df = df.where(pd.notnull(df), None)
             self._cache["final_research"] = df.to_dict(orient="records")
         return self._cache["final_research"]
 

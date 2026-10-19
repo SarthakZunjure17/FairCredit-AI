@@ -177,3 +177,63 @@ def test_individual_shap_feature_formatting():
     assert "feature" in first_attr
     assert "feature_raw" in first_attr
     assert not first_attr["feature"].startswith("cat__")
+
+
+def test_final_research_endpoint_all_six():
+    response = client.get("/api/research/final-results")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 6
+    
+    first = data[0]
+    required_keys = [
+        "Dataset", "Model", "Baseline_AUC", "Reweighed_AUC", "Delta_AUC",
+        "Baseline_EOD", "Reweighed_EOD", "Delta_EOD", "Baseline_DPD", "Reweighed_DPD",
+        "Baseline_Approval_DI", "Reweighed_Approval_DI", "Mean_SHAP_Cosine",
+        "Cosine_CI_Lower", "Cosine_CI_Upper", "Mean_Top5_Overlap", "Mean_Spearman",
+        "Explanation_Sample_Size"
+    ]
+    for k in required_keys:
+        assert k in first, f"Missing key {k} in final-results response"
+
+def test_final_research_filtering():
+    # Filter by dataset
+    resp_taiwan = client.get("/api/research/final-results?dataset=taiwan")
+    assert resp_taiwan.status_code == 200
+    data_taiwan = resp_taiwan.json()
+    assert len(data_taiwan) == 3
+    assert all(r["Dataset"] == "taiwan" for r in data_taiwan)
+    
+    # Filter by model
+    resp_rf = client.get("/api/research/final-results?model=random_forest")
+    assert resp_rf.status_code == 200
+    data_rf = resp_rf.json()
+    assert len(data_rf) == 2
+    assert all(r["Model"] == "random_forest" for r in data_rf)
+    
+    # Combined filter: german random_forest
+    resp_german_rf = client.get("/api/research/final-results?dataset=german&model=random_forest")
+    assert resp_german_rf.status_code == 200
+    data_grf = resp_german_rf.json()
+    assert len(data_grf) == 1
+    row = data_grf[0]
+    assert row["Dataset"] == "german"
+    assert row["Model"] == "random_forest"
+    assert row["Baseline_AUC"] == 0.7798
+    assert row["Reweighed_AUC"] == 0.7935
+    assert row["Baseline_EOD"] == 0.1250
+    assert row["Reweighed_EOD"] == 0.0500
+    assert row["Mean_SHAP_Cosine"] == 0.9652
+    assert row["Explanation_Sample_Size"] == 200
+
+def test_final_research_invalid_filters():
+    # Invalid dataset
+    resp_bad_ds = client.get("/api/research/final-results?dataset=nonexistent")
+    assert resp_bad_ds.status_code == 400
+    assert "Invalid dataset" in resp_bad_ds.json()["detail"]
+    
+    # Invalid model
+    resp_bad_m = client.get("/api/research/final-results?model=neural_network")
+    assert resp_bad_m.status_code == 400
+    assert "Invalid model" in resp_bad_m.json()["detail"]

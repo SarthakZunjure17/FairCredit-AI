@@ -12,7 +12,8 @@ from backend.app.schemas.research import (
     ConfigurationMetadata,
     ResearchMatrixRow,
     ShapSummaryRow,
-    IndividualShapQueryResponse
+    IndividualShapQueryResponse,
+    FinalResearchResultRow
 )
 from backend.app.services.model_service import model_service
 from backend.app.services.research_service import research_service
@@ -101,9 +102,34 @@ def get_qualitative_matrix():
 def get_mitigation_master():
     return research_service.get_mitigation_master()
 
-@router.get("/research/final-results")
-def get_final_results():
-    return research_service.get_final_research_results()
+@router.get("/research/final-results", response_model=List[FinalResearchResultRow])
+def get_final_results(
+    dataset: Optional[str] = Query(None, description="Filter by dataset: taiwan or german"),
+    model: Optional[str] = Query(None, description="Filter by model: logistic_regression, random_forest, or xgboost")
+):
+    valid_datasets = {"taiwan", "german"}
+    valid_models = {"logistic_regression", "random_forest", "xgboost"}
+
+    if dataset and dataset.lower() not in valid_datasets:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid dataset '{dataset}'. Supported datasets: taiwan, german"
+        )
+
+    if model and model.lower() not in valid_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model '{model}'. Supported models: logistic_regression, random_forest, xgboost"
+        )
+
+    results = research_service.get_final_research_results()
+
+    if dataset:
+        results = [r for r in results if r.get("Dataset", "").lower() == dataset.lower()]
+    if model:
+        results = [r for r in results if r.get("Model", "").lower() == model.lower()]
+
+    return results
 
 @router.get("/research/shap-summary", response_model=List[ShapSummaryRow])
 def get_shap_summary():

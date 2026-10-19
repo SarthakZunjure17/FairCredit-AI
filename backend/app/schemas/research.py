@@ -65,3 +65,32 @@ class IndividualShapQueryResponse(BaseModel):
     model: str
     applicant_idx: int
     attributions: List[Dict[str, Any]]
+
+class FinalResearchResultRow(BaseModel):
+    Dataset: str
+    Model: str
+    Baseline_AUC: float
+    Reweighed_AUC: float
+    Delta_AUC: float
+    Relative_AUC_Change_Percent: Optional[float] = None
+    Baseline_EOD: float
+    Reweighed_EOD: float
+    Delta_EOD: float
+    Relative_EOD_Change_Percent: Optional[float] = None
+    Baseline_DPD: float
+    Reweighed_DPD: float
+    Delta_DPD: float
+    Baseline_Approval_DI: Optional[float] = None
+    Reweighed_Approval_DI: Optional[float] = None
+    Mean_SHAP_Cosine: Optional[float] = None
+    Median_SHAP_Cosine: Optional[float] = None
+    Cosine_CI_Lower: Optional[float] = None
+    Cosine_CI_Upper: Optional[float] = None
+    Mean_Top5_Overlap: Optional[float] = None
+    Median_Top5_Overlap: Optional[float] = None
+    Mean_Spearman: Optional[float] = None
+    Median_Spearman: Optional[float] = None
+    Explanation_Sample_Size: Optional[int] = None
+    Fairness_Direction: Optional[str] = None
+    Performance_Direction: Optional[str] = None
+    Explanation_Consistency_Level: Optional[str] = None

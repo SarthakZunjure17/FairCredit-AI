@@ -5,7 +5,8 @@
   ResearchMatrixRow,
   ShapSummaryRow,
   CaseStudyData,
-  IndividualShapResponse
+  IndividualShapResponse,
+  FinalResearchResultRow
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
@@ -46,7 +47,13 @@ export const api = {
   
   getMitigationMaster: () => fetchJson<any[]>("/research/mitigations"),
   
-  getFinalResearch: () => fetchJson<any[]>("/research/final-results"),
+  getFinalResearch: (dataset?: string, model?: string) => {
+    const params = new URLSearchParams();
+    if (dataset) params.append("dataset", dataset);
+    if (model) params.append("model", model);
+    const q = params.toString() ? `?${params.toString()}` : "";
+    return fetchJson<FinalResearchResultRow[]>(`/research/final-results${q}`);
+  },
   
   getShapSummary: () => fetchJson<ShapSummaryRow[]>("/research/shap-summary"),
   

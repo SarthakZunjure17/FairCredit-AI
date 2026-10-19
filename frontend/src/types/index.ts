@@ -147,3 +147,33 @@ export interface IndividualShapResponse {
     diff_shap: number;
   }>;
 }
+
+export interface FinalResearchResultRow {
+  Dataset: string;
+  Model: string;
+  Baseline_AUC: number;
+  Reweighed_AUC: number;
+  Delta_AUC: number;
+  Relative_AUC_Change_Percent?: number;
+  Baseline_EOD: number;
+  Reweighed_EOD: number;
+  Delta_EOD: number;
+  Relative_EOD_Change_Percent?: number;
+  Baseline_DPD: number;
+  Reweighed_DPD: number;
+  Delta_DPD: number;
+  Baseline_Approval_DI?: number;
+  Reweighed_Approval_DI?: number;
+  Mean_SHAP_Cosine?: number;
+  Median_SHAP_Cosine?: number;
+  Cosine_CI_Lower?: number;
+  Cosine_CI_Upper?: number;
+  Mean_Top5_Overlap?: number;
+  Median_Top5_Overlap?: number;
+  Mean_Spearman?: number;
+  Median_Spearman?: number;
+  Explanation_Sample_Size?: number;
+  Fairness_Direction?: string;
+  Performance_Direction?: string;
+  Explanation_Consistency_Level?: string;
+}
